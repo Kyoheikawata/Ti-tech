@@ -1,4 +1,5 @@
 // app/api/export/route.ts
+import { Workbook } from "exceljs";
 import { readFile } from "fs/promises";
 import path from "path";
 export const runtime = "nodejs"; // Node ランタイム必須（ファイルI/O & Buffer）
@@ -183,50 +184,54 @@ export async function POST(req: Request) {
   if (data.settings.company.address) sheet.cell("B46").value(data.settings.company.address);
   if (data.settings.company.name)    sheet.cell("B47").value(data.settings.company.name);
 
-  try {
-  const logoPath = path.join(process.cwd(), "public", "logo.png");
-  const logoBin  = await readFile(logoPath);
-  const logoB64  = "data:image/png;base64," + logoBin.toString("base64");
 
-  // ★ テンプレと同じ位置に合わせる：B49:F53（必要に応じて調整）
-  //    from: { row: 行番号, col: 列番号 }  ※A=1, B=2 ...
-  (sheet as any).addImage?.({
-    image: logoB64,
-    name: "ti-tech-logo",
-    from: { row: 49, col: 2 },   // B49
-    to:   { row: 53, col: 6 },   // F53
-  });
+
+  // 出力 & ダウンロードレスポンス
+// ===== xlsx-populate でセル書き込み完了 =====
+const out = await wb.outputAsync(); // ArrayBuffer | Uint8Array
+
+// xlsx-populate の出力を ArrayBuffer に正規化（新規にコピー）
+const toArrayBuffer = (x: ArrayBuffer | Uint8Array): ArrayBuffer => {
+  const src = x instanceof ArrayBuffer ? new Uint8Array(x) : x;
+  const ab = new ArrayBuffer(src.byteLength);
+  new Uint8Array(ab).set(src);
+  return ab;
+};
+const ab = toArrayBuffer(out);
+
+// ===== ExcelJS でロゴを “セルにアンカー” して再挿入 =====
+const book = new Workbook();
+await book.xlsx.load(ab);
+
+// シート特定（A1に「見積書」を含むシート、なければ先頭）
+const ws =
+  book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
+  book.worksheets[0];
+
+try {
+const logoPath = path.join(process.cwd(), "public", "logo.png");
+const logoBuf  = await readFile(logoPath);
+const logoB64  = "data:image/png;base64," + logoBuf.toString("base64"); // ★base64化
+const imgId = book.addImage({ base64: logoB64, extension: "png" });     // ★buffer→base64
+
+  // ★ ロゴ位置：テンプレと同じセル範囲にアンカー
+  //    例) B49:F53（0始まり指定なので B→col:1, 行49→row:48）
+ws.addImage(imgId, "B49:F53");
 } catch (e) {
-  // ロゴが無くても出力は継続
   console.warn("logo insert skipped:", e);
 }
 
-  // 出力 & ダウンロードレスポンス
-const out = await wb.outputAsync(); // ArrayBuffer | Uint8Array
+// 最終バイナリを返す
+const finalAb = await book.xlsx.writeBuffer(); // ArrayBuffer（環境により Uint8Array のことも）
+const body =
+  finalAb instanceof ArrayBuffer ? finalAb : toArrayBuffer(finalAb as Uint8Array);
 
-// 必ず「新しい ArrayBuffer」にコピーして返す（SharedArrayBuffer/Buffer を気にしないでOK）
-function toArrayBuffer(x: ArrayBuffer | Uint8Array): ArrayBuffer {
-  if (x instanceof ArrayBuffer) {
-    const src = new Uint8Array(x);
-    const ab = new ArrayBuffer(src.byteLength);
-    new Uint8Array(ab).set(src);
-    return ab;
-  } else {
-    // Uint8Array（Bufferも instanceof Uint8Array になる）
-    const src = x;
-    const ab = new ArrayBuffer(src.byteLength);
-    new Uint8Array(ab).set(src);
-    return ab;
-  }
-}
-
-const bodyAb = toArrayBuffer(out);
-
-return new Response(bodyAb, {
+return new Response(body, {
   headers: {
     "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "Content-Disposition": `attachment; filename="estimate_${data.meta.invoiceNo}.xlsx"`,
     "Cache-Control": "no-store",
   },
 });
+
 }

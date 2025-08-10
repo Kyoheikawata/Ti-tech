@@ -23,7 +23,7 @@ type WorkbookLite = {
     sheet(index: number | string): SheetLite;
     outputAsync(): Promise<ArrayBuffer>;
 };
-type XlsxPopulateLike = { fromDataAsync: (ab: ArrayBuffer) => Promise<WorkbookLite> };
+
 
 // ---- 型定義（アプリ用） ----
 type ServiceDef = {
