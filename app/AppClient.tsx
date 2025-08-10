@@ -107,7 +107,7 @@ export default function AppClient() {
     tax: { rate: 0.10 as number },
   });
   const [showSettings, setShowSettings] = useState(false);
-
+const [customerOpen, setCustomerOpen] = useState(true);
   // --- 法定費用（非課税）：単価・個数（初期qty=0） ---
   const [legal, setLegal] = useState<Legal>({
     jibaiseki24m: { unit: 0, qty: 0 },
@@ -201,151 +201,25 @@ export default function AppClient() {
   }
 
   // ==================== Excel 出力 ====================
-  async function exportExcel() {
-    try {
-      // ブラウザ版 xlsx-populate を動的インポート（型は自前の最小型で扱う）
-      const mod = await import("xlsx-populate/browser/xlsx-populate");
-      const XlsxPopulate: XlsxPopulateLike =
-        ((mod as unknown as { default?: XlsxPopulateLike }).default ?? (mod as unknown as XlsxPopulateLike));
-
-      const res = await fetch("/templates/shaken_template.xlsx", { cache: "no-store" });
-      if (!res.ok) { alert("テンプレートが見つかりません。/public/templates/shaken_template.xlsx を配置してください。"); return; }
-      const ab = await res.arrayBuffer();
-      const wb = await XlsxPopulate.fromDataAsync(ab);
-
-      const candidate = wb.sheets().find((s) => String(s.cell("A1").value() ?? "").includes("見積書"));
-      const sheet = (candidate ?? wb.sheet(0));
-
-      const moneyFmt = '"¥"#,##0;-"¥"#,##0';
-
-      // ---- 上部：宛名・日付・車両 ----
-      sheet.cell("A2").value(client.name || "");
-      const d = meta.date ? new Date(meta.date) : new Date();
-      sheet.cell("F2").value(d).style("numberFormat", "yyyy/m/d");
-      sheet.cell("B3").value(vehicle.registrationNo || "");
-      sheet.cell("D3").value(vehicle.modelCode || "");
-      sheet.cell("B4").value(vehicle.model || "");
-      sheet.cell("D4").value(vehicle.vin || "");
-      sheet.cell("B5").value(vehicle.mileage ? `${vehicle.mileage} km` : "　km");
-      sheet.cell("D5").value(vehicle.engineModel || "");
-      sheet.cell("B6").value(vehicle.firstReg || "");
-      sheet.cell("D6").value(vehicle.nextInspection || "");
-
-      // ---- 法定費用（非課税）：D=単価 / E=個数 / F=金額 ----
-      const L9  = Number(legal.jibaiseki24m.unit||0) * Number(legal.jibaiseki24m.qty||0);
-      const L10 = Number(legal.weightTax.unit||0)    * Number(legal.weightTax.qty||0);
-      const L11 = Number(legal.stamp.unit||0)        * Number(legal.stamp.qty||0);
-
-      sheet.cell("D9").value(Number(legal.jibaiseki24m.unit||0)).style("numberFormat", moneyFmt);
-      sheet.cell("E9").value(Number(legal.jibaiseki24m.qty ||0)).style("numberFormat", "0");
-      sheet.cell("F9").value(L9).style("numberFormat", moneyFmt);
-
-      sheet.cell("D10").value(Number(legal.weightTax.unit||0)).style("numberFormat", moneyFmt);
-      sheet.cell("E10").value(Number(legal.weightTax.qty ||0)).style("numberFormat", "0");
-      sheet.cell("F10").value(L10).style("numberFormat", moneyFmt);
-
-      sheet.cell("D11").value(Number(legal.stamp.unit||0)).style("numberFormat", moneyFmt);
-      sheet.cell("E11").value(Number(legal.stamp.qty ||0)).style("numberFormat", "0");
-      sheet.cell("F11").value(L11).style("numberFormat", moneyFmt);
-
-      // ---- 明細（A15:F36想定）→ 未使用行は非表示 ----
-      const START = 15, TEMPLATE_ROWS = 22, END = START + TEMPLATE_ROWS - 1;
-      const used = Math.min(items.length, TEMPLATE_ROWS);
-
-      for (let r = START; r <= END; r++) {
-        sheet.row(r).hidden(false);
-        // F列（テンプレ式）を守るため、A〜Eのみ初期化
-        ["A","B","C","D","E"].forEach(col => sheet.cell(`${col}${r}`).value(null));
-      }
-
-      for (let i = 0; i < used; i++) {
-        const it = items[i];
-        const r  = START + i;
-        const qty   = Math.max(0, Number(it.qty || 0));
-        const price = Number(it.price || 0);
-
-        sheet.cell(`A${r}`).value(qty > 1 ? `×${qty}` : (qty > 0 ? "✓" : ""));
-        sheet.cell(`B${r}`).value(it.name || "");
-        sheet.cell(`D${r}`).value(price).style("numberFormat", moneyFmt);
-        sheet.cell(`E${r}`).value(qty).style("numberFormat", "0");
-        // F列はテンプレ式に任せる
-      }
-      for (let r = START + used; r <= END; r++) sheet.row(r).hidden(true);
-
-      // ---- 技術料など（課税）：D=単価 / E=個数（Fは式に任せる）----
-      sheet.cell("D37").value(Number(fees.partsExchangeTech.unit||0)).style("numberFormat", moneyFmt);
-      sheet.cell("E37").value(Number(fees.partsExchangeTech.qty ||0)).style("numberFormat", "0");
-      sheet.cell("D38").value(Number(fees.proxy.unit||0)).style("numberFormat", moneyFmt);
-      sheet.cell("E38").value(Number(fees.proxy.qty ||0)).style("numberFormat", "0");
-      sheet.cell("D39").value(Number(fees.basic.unit||0)).style("numberFormat", moneyFmt);
-      sheet.cell("E39").value(Number(fees.basic.qty ||0)).style("numberFormat", "0");
-
-      // ===== ラベル探索（値引き/預り金 用）=====
-      const usedRange = () => {
-        const rng = sheet.usedRange();
-        return {
-          values: rng.value() as unknown[][],
-          startRow: rng.startCell().rowNumber(),
-          startCol: rng.startCell().columnNumber(),
-        };
-      };
-      const norm = (s: string) => String(s).replace(/\s+/g, "");
-
-      function findLabelCell(
-        matchers: (string | RegExp)[],
-        opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
-      ): { row:number; col:number } | null {
-        const { values, startRow, startCol } = usedRange();
-        const rStart = opt?.searchFromBottom ? values.length - 1 : 0;
-        const rEnd   = opt?.searchFromBottom ? -1 : values.length;
-        const rStep  = opt?.searchFromBottom ? -1 : 1;
-
-        for (let i = rStart; i !== rEnd; i += rStep) {
-          const rowNumber = startRow + i;
-          if (opt?.rowMin && rowNumber < opt.rowMin) continue;
-          if (opt?.rowMax && rowNumber > opt.rowMax) continue;
-
-          const rowVals = values[i];
-          for (let j = 0; j < rowVals.length; j++) {
-            const v = rowVals[j];
-            if (typeof v !== "string") continue;
-            const s = norm(v);
-            const hit = matchers.some(m => typeof m === "string" ? s.includes(norm(m)) : (m as RegExp).test(s));
-            if (hit) return { row: rowNumber, col: startCol + j };
-          }
-        }
-        return null;
-      }
-
-      // 値引き・預り金は同じ行の「F列（金額）」へ直接
-      function writeToAmountColumnF(
-        matchers: (string|RegExp)[],
-        val: number,
-        money = true,
-        opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
-      ) {
-        const pos = findLabelCell(matchers, opt);
-        if (!pos) { console.warn("label not found:", matchers); return; }
-        sheet.cell(`F${pos.row}`).value(val).style("numberFormat", money ? moneyFmt : "0");
-      }
-
-      writeToAmountColumnF(["調整値引き"], Number(fees.discount||0), true, { searchFromBottom: true });
-      writeToAmountColumnF(["預り金"],     Number(fees.deposit ||0), true, { searchFromBottom: true });
-
-      // 会社情報（任意）
-      if (settings.company.address) sheet.cell("B46").value(settings.company.address);
-      if (settings.company.name)    sheet.cell("B47").value(settings.company.name);
-
-      const out = await wb.outputAsync();
-      downloadBlob(`estimate_${meta.invoiceNo}.xlsx`,
-        new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-      );
-    } catch (e: unknown) {
-      console.error(e);
-      const msg = e instanceof Error ? e.message : String(e);
-      alert(`Excel出力でエラーが発生しました。\n${msg}`);
+async function exportExcel() {
+  try {
+    const payload = { client, vehicle, items, legal, fees, settings, meta };
+    const res = await fetch("/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(()=>"");
+      throw new Error(`エクスポートに失敗しました: ${res.status} ${txt}`);
     }
+    const blob = await res.blob();
+    downloadBlob(`estimate_${meta.invoiceNo}.xlsx`, blob);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    alert(`Excel出力でエラーが発生しました。\n${msg}`);
   }
+}
 
   // --------------------------- UI ---------------------------
   return (
@@ -372,83 +246,118 @@ export default function AppClient() {
 
       <main className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-4">
         {/* 左：検索・顧客・車両 */}
-        <section className="md:col-span-3">
-          <div className="bg-white rounded-2xl shadow-sm border p-3">
-            <div className="text-sm font-semibold mb-2">品目検索</div>
-            <input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="キーワード検索" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"/>
-            <div className="mt-3 text-sm font-semibold mb-1">カテゴリー</div>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((c)=>(
-                <button key={c} type="button" onClick={()=>setCat(c)} className={`px-3 py-1.5 rounded-full border text-xs ${cat===c?"bg-sky-600 text-white border-sky-600":"bg-white hover:bg-slate-100"}`}>
-                  {c}
-                </button>
-              ))}
+<section className="md:col-span-3">
+  {/* === 顧客情報ボックス（スマホは折りたたみ可 / 初期オープン） === */}
+  <div className="bg-white rounded-2xl shadow-sm border p-3">
+    <div className="flex items-center justify-between">
+      <div className="text-sm font-semibold">顧客情報</div>
+      {/* モバイルのみトグルボタン表示（md以上は常時展開） */}
+      <button
+        type="button"
+        onClick={() => setCustomerOpen((o) => !o)}
+        className="md:hidden inline-flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-slate-50"
+        aria-expanded={customerOpen}
+        aria-controls="customer-panel"
+      >
+        {customerOpen ? "閉じる" : "開く"}
+        <svg
+          className={`w-3 h-3 transition-transform ${customerOpen ? "rotate-180" : "rotate-0"}`}
+          viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+        >
+          <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.08 1.04l-4.25 4.25a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06z"/>
+        </svg>
+      </button>
+    </div>
+
+    {/* 中身はスマホで開閉 / md以上は常に表示 */}
+    <div id="customer-panel" className={`${customerOpen ? "block" : "hidden"} md:block`}>
+      <div className="grid gap-2 text-sm mt-3">
+        <input className="border rounded-lg px-3 py-2" placeholder="宛名（氏名/会社）" value={client.name} onChange={(e)=>setClient({...client,name:e.target.value})}/>
+        <input className="border rounded-lg px-3 py-2" placeholder="電話" value={client.phone} onChange={(e)=>setClient({...client,phone:e.target.value})}/>
+        <input className="border rounded-lg px-3 py-2" placeholder="Email" value={client.email} onChange={(e)=>setClient({...client,email:e.target.value})}/>
+        <input className="border rounded-lg px-3 py-2" placeholder="住所" value={client.address} onChange={(e)=>setClient({...client,address:e.target.value})}/>
+      </div>
+
+      <div className="text-sm font-semibold mt-4 mb-2">車両情報</div>
+      <div className="grid gap-2 text-sm">
+        <input className="border rounded-lg px-3 py-2" placeholder="登録番号" value={vehicle.registrationNo} onChange={(e)=>setVehicle({...vehicle,registrationNo:e.target.value})}/>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input className="border rounded-lg px-3 py-2" placeholder="車名" value={vehicle.model} onChange={(e)=>setVehicle({...vehicle,model:e.target.value})}/>
+          <input className="border rounded-lg px-3 py-2" placeholder="型式" value={vehicle.modelCode} onChange={(e)=>setVehicle({...vehicle,modelCode:e.target.value})}/>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input className="border rounded-lg px-3 py-2" placeholder="車台番号" value={vehicle.vin} onChange={(e)=>setVehicle({...vehicle,vin:e.target.value})}/>
+          <input className="border rounded-lg px-3 py-2" placeholder="原動機型式" value={vehicle.engineModel} onChange={(e)=>setVehicle({...vehicle,engineModel:e.target.value})}/>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input className="border rounded-lg px-3 py-2" placeholder="走行距離 (km)" value={vehicle.mileage} onChange={(e)=>setVehicle({...vehicle,mileage:e.target.value})}/>
+          <input className="border rounded-lg px-3 py-2" placeholder="初年度登録" value={vehicle.firstReg} onChange={(e)=>setVehicle({...vehicle,firstReg:e.target.value})}/>
+        </div>
+        <input className="border rounded-lg px-3 py-2" placeholder="次回車検有効期限" value={vehicle.nextInspection} onChange={(e)=>setVehicle({...vehicle,nextInspection:e.target.value})}/>
+      </div>
+
+      {/* 法定費用（非課税） 単価/個数 */}
+      <div className="text-sm font-semibold mt-4 mb-2">法定費用（非課税）</div>
+      <div className="grid gap-2 text-sm">
+        {([
+          { key: "jibaiseki24m", label: "自賠責保険24ヶ月" },
+          { key: "weightTax",    label: "重量税" },
+          { key: "stamp",        label: "印紙代" },
+        ] as {key: LegalKey; label:string}[]).map(({key, label}) => (
+          <div key={key} className="grid grid-cols-12 items-center gap-2">
+            <span className="col-span-6 sm:col-span-5">{label}</span>
+            <input
+              type="text" inputMode="numeric" pattern="\d*"
+              className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
+              placeholder="単価"
+              value={legalDraft[key].unit}
+              onChange={(e)=> setLegalDraft((p)=>({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,]/g,'') } }))}
+              onBlur={()=> setLegal((p)=>({ ...p, [key]: { unit: toNum(legalDraft[key].unit), qty: p[key].qty } }))}
+            />
+            <input
+              type="text" inputMode="numeric" pattern="\d*"
+              className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
+              placeholder="個数"
+              value={legalDraft[key].qty}
+              onChange={(e)=> setLegalDraft((p)=>({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,]/g,'') } }))}
+              onBlur={()=> setLegal((p)=>({ ...p, [key]: { unit: p[key].unit, qty: toNum(legalDraft[key].qty) } }))}
+            />
+            <div className="col-span-12 sm:col-span-2 text-right">
+              {key==="jibaiseki24m" && yen(legal.jibaiseki24m.unit*legal.jibaiseki24m.qty)}
+              {key==="weightTax"    && yen(legal.weightTax.unit*legal.weightTax.qty)}
+              {key==="stamp"        && yen(legal.stamp.unit*legal.stamp.qty)}
             </div>
           </div>
+        ))}
+      </div>
+    </div>
+  </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border p-3 mt-4">
-            <div className="text-sm font-semibold mb-2">顧客情報</div>
-            <div className="grid gap-2 text-sm">
-              <input className="border rounded-lg px-3 py-2" placeholder="宛名（氏名/会社）" value={client.name} onChange={(e)=>setClient({...client,name:e.target.value})}/>
-              <input className="border rounded-lg px-3 py-2" placeholder="電話" value={client.phone} onChange={(e)=>setClient({...client,phone:e.target.value})}/>
-              <input className="border rounded-lg px-3 py-2" placeholder="Email" value={client.email} onChange={(e)=>setClient({...client,email:e.target.value})}/>
-              <input className="border rounded-lg px-3 py-2" placeholder="住所" value={client.address} onChange={(e)=>setClient({...client,address:e.target.value})}/>
-            </div>
+  {/* === 品目検索ボックス（後ろに移動） === */}
+  <div className="bg-white rounded-2xl shadow-sm border p-3 mt-4">
+    <div className="text-sm font-semibold mb-2">品目検索</div>
+    <input
+      value={q}
+      onChange={(e)=>setQ(e.target.value)}
+      placeholder="キーワード検索"
+      className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+    />
+    <div className="mt-3 text-sm font-semibold mb-1">カテゴリー</div>
+    <div className="flex flex-wrap gap-2">
+      {categories.map((c)=>(
+        <button
+          key={c}
+          type="button"
+          onClick={()=>setCat(c)}
+          className={`px-3 py-1.5 rounded-full border text-xs ${cat===c?"bg-sky-600 text-white border-sky-600":"bg-white hover:bg-slate-100"}`}
+        >
+          {c}
+        </button>
+      ))}
+    </div>
+  </div>
+</section>
 
-            <div className="text-sm font-semibold mt-4 mb-2">車両情報</div>
-            <div className="grid gap-2 text-sm">
-              <input className="border rounded-lg px-3 py-2" placeholder="登録番号" value={vehicle.registrationNo} onChange={(e)=>setVehicle({...vehicle,registrationNo:e.target.value})}/>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input className="border rounded-lg px-3 py-2" placeholder="車名" value={vehicle.model} onChange={(e)=>setVehicle({...vehicle,model:e.target.value})}/>
-                <input className="border rounded-lg px-3 py-2" placeholder="型式" value={vehicle.modelCode} onChange={(e)=>setVehicle({...vehicle,modelCode:e.target.value})}/>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input className="border rounded-lg px-3 py-2" placeholder="車台番号" value={vehicle.vin} onChange={(e)=>setVehicle({...vehicle,vin:e.target.value})}/>
-                <input className="border rounded-lg px-3 py-2" placeholder="原動機型式" value={vehicle.engineModel} onChange={(e)=>setVehicle({...vehicle,engineModel:e.target.value})}/>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input className="border rounded-lg px-3 py-2" placeholder="走行距離 (km)" value={vehicle.mileage} onChange={(e)=>setVehicle({...vehicle,mileage:e.target.value})}/>
-                <input className="border rounded-lg px-3 py-2" placeholder="初年度登録" value={vehicle.firstReg} onChange={(e)=>setVehicle({...vehicle,firstReg:e.target.value})}/>
-              </div>
-              <input className="border rounded-lg px-3 py-2" placeholder="次回車検有効期限" value={vehicle.nextInspection} onChange={(e)=>setVehicle({...vehicle,nextInspection:e.target.value})}/>
-            </div>
-
-            {/* 法定費用（非課税） 単価/個数 */}
-            <div className="text-sm font-semibold mt-4 mb-2">法定費用（非課税）</div>
-            <div className="grid gap-2 text-sm">
-              {([
-                { key: "jibaiseki24m", label: "自賠責保険24ヶ月" },
-                { key: "weightTax",    label: "重量税" },
-                { key: "stamp",        label: "印紙代" },
-              ] as {key: LegalKey; label:string}[]).map(({key, label}) => (
-                <div key={key} className="grid grid-cols-12 items-center gap-2">
-                  <span className="col-span-6 sm:col-span-5">{label}</span>
-                  <input
-                    type="text" inputMode="numeric" pattern="\d*"
-                    className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
-                    placeholder="単価"
-                    value={legalDraft[key].unit}
-                    onChange={(e)=> setLegalDraft((p)=>({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,]/g,'') } }))}
-                    onBlur={()=> setLegal((p)=>({ ...p, [key]: { unit: toNum(legalDraft[key].unit), qty: p[key].qty } }))}
-                  />
-                  <input
-                    type="text" inputMode="numeric" pattern="\d*"
-                    className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
-                    placeholder="個数"
-                    value={legalDraft[key].qty}
-                    onChange={(e)=> setLegalDraft((p)=>({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,]/g,'') } }))}
-                    onBlur={()=> setLegal((p)=>({ ...p, [key]: { unit: p[key].unit, qty: toNum(legalDraft[key].qty) } }))}
-                  />
-                  <div className="col-span-12 sm:col-span-2 text-right">
-                    {key==="jibaiseki24m" && yen(legal.jibaiseki24m.unit*legal.jibaiseki24m.qty)}
-                    {key==="weightTax"    && yen(legal.weightTax.unit*legal.weightTax.qty)}
-                    {key==="stamp"        && yen(legal.stamp.unit*legal.stamp.qty)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* 中央：品目追加 */}
         <section className="md:col-span-5">
