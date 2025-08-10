@@ -202,7 +202,8 @@ const ab = toArrayBuffer(out);
 // ===== ExcelJS でロゴを “セルにアンカー” して再挿入 =====
 const book = new Workbook();
 await book.xlsx.load(ab);
-
+const images = typeof ws.getImages === "function" ? ws.getImages() : [];
+for (const im of images) ws.removeImage(im.imageId);
 // シート特定（A1に「見積書」を含むシート、なければ先頭）
 const ws =
   book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
@@ -216,7 +217,7 @@ const imgId = book.addImage({ base64: logoB64, extension: "png" });     // ★bu
 
   // ★ ロゴ位置：テンプレと同じセル範囲にアンカー
   //    例) B49:F53（0始まり指定なので B→col:1, 行49→row:48）
-ws.addImage(imgId, "B49:F53");
+ws.addImage(imgId, "A44:A49");
 } catch (e) {
   console.warn("logo insert skipped:", e);
 }
