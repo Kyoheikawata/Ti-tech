@@ -57,10 +57,9 @@ export async function POST(req: Request) {
   const data: ExportPayload = await req.json();
 
   // 1) テンプレを exceljs で読込
-  const templatePath = path.join(process.cwd(), "public", "templates", "shaken_template.xlsx");
-  const templateBuf = await readFile(templatePath);
-  const book = new Workbook();
-  await book.xlsx.load(templateBuf);
+const templatePath = path.join(process.cwd(), "public", "templates", "shaken_template.xlsx");
+const book = new Workbook();
+await book.xlsx.readFile(templatePath);
 
   // 対象シート（A1 に「見積書」を含む / 無ければ先頭）
   const ws =
