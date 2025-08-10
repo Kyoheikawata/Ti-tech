@@ -1,0 +1,590 @@
+"use client";
+import React, { useEffect, useMemo, useState } from "react";
+
+// ---- サンプル品目（税込） ----
+const SERVICES = [
+    { id: "susp_fork_oh_std", cat: "サスペンション系統", name: "フォークOH（正立・カートリッジ無）", price: 24800, bringIn: 49600, notes: "" },
+    { id: "susp_fork_oh_cart", cat: "サスペンション系統", name: "フォークOH（倒立・正立カートリッジ式）", price: 29700, bringIn: 59400, notes: "" },
+    { id: "brake_pad", cat: "ブレーキ系統", name: "ブレーキパッド（１キャリパー）", price: 2640 },
+    { id: "brake_fluid", cat: "ブレーキ系統", name: "ブレーキフルード（１ライン）フルード代別", price: 2500 },
+    { id: "drive_125", cat: "駆動系統", name: "駆動系（～125ccまで）", price: 6600 },
+    { id: "drive_chain_clip", cat: "駆動系統", name: "チェーン（クリップジョイント）", price: 3800 },
+    { id: "intake_air", cat: "吸排気系統", name: "エアエレメント交換", price: 2500 },
+    { id: "exhaust_slipon", cat: "吸排気系統", name: "マフラー スリップオン", price: 5000 },
+    { id: "inspect_proxy", cat: "車検（２輪）", name: "車検代行費用", price: 10000 },
+    { id: "basic_fee", cat: "車検（２輪）", name: "車検整備基本料", price: 19800 },
+] as const;
+
+function yen(n: number) {
+    if (typeof n !== "number" || Number.isNaN(n)) return "-";
+    return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY" }).format(n);
+}
+function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const LS_KEY_SETTINGS = "moto_invoice_settings_v1";
+
+// 数字文字列→数値（空・カンマ許容）
+const toNum = (v: string | number) => {
+    if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+    const s = v.replace(/,/g, "").trim();
+    return s === "" ? 0 : Number(s);
+};
+
+export default function AppClient() {
+    // 検索・選択
+    const [q, setQ] = useState("");
+    const [cat, setCat] = useState("ALL");
+    const [useBringIn, setUseBringIn] = useState<Record<string, boolean>>({});
+    const [qtyDraft, setQtyDraft] = useState<Record<string, number | string>>({});
+    const [items, setItems] = useState<{ id: string; name: string; price: number; qty: number; notes?: string; cat: string }[]>([]);
+
+    // 顧客・車両・見積メタ
+    const [client, setClient] = useState({ name: "", phone: "", email: "", address: "" });
+    const [vehicle, setVehicle] = useState({
+        registrationNo: "",
+        model: "", modelCode: "", vin: "", engineModel: "",
+        mileage: "", firstReg: "", nextInspection: "",
+    });
+    const [meta, setMeta] = useState({ date: todayISO(), invoiceNo: "INV-" + todayISO().replaceAll("-", "") + "-001" });
+
+    // 事業者情報
+    const [settings, setSettings] = useState({
+        company: {
+            name: "Ti-tech",
+            address: "大阪府大阪狭山市大野台6−12−8  589-0023",
+            phone: "06-1234-5678",
+            bank: "三井住友銀行 ○○支店 普通 1234567 カワタキョウヘイ",
+            logoUrl: "/logo.png",
+        },
+        tax: { rate: 0.10 as number },
+    });
+    const [showSettings, setShowSettings] = useState(false);
+
+    // --- 法定費用（非課税）：単価・個数 ---
+    const [legal, setLegal] = useState({
+        jibaiseki24m: { unit: 0, qty: 0 }, // 自賠責 24ヶ月
+        weightTax: { unit: 0, qty: 0 }, // 重量税
+        stamp: { unit: 0, qty: 0 }, // 印紙代
+    });
+    const [legalDraft, setLegalDraft] = useState({
+        jibaiseki24m: { unit: "", qty: "" },
+        weightTax: { unit: "", qty: "" },
+        stamp: { unit: "", qty: "" },
+    });
+
+    // --- 技術料など（課税）：単価・個数（値引き/預り金は金額） ---
+    const [fees, setFees] = useState({
+        partsExchangeTech: { unit: 0, qty: 0 },
+        proxy: { unit: 0, qty: 0 },
+        basic: { unit: 0, qty: 0 },
+        discount: 0,
+        deposit: 0,
+    });
+    const [feesDraft, setFeesDraft] = useState({
+        partsExchangeTech: { unit: "", qty: "" },
+        proxy: { unit: "", qty: "" },
+        basic: { unit: "", qty: "" },
+        discount: "",
+        deposit: "",
+    });
+
+    // LocalStorage
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(LS_KEY_SETTINGS);
+            if (raw) setSettings((s) => ({ ...s, ...JSON.parse(raw) }));
+        } catch { }
+    }, []);
+    useEffect(() => {
+        try { localStorage.setItem(LS_KEY_SETTINGS, JSON.stringify(settings)); } catch { }
+    }, [settings]);
+
+    // 派生
+    const categories = useMemo(() => {
+        const s = new Set(["ALL"]); (SERVICES as readonly any[]).forEach((x) => s.add(x.cat)); return Array.from(s);
+    }, []);
+    const filtered = useMemo(() => {
+        const kw = q.trim().toLowerCase();
+        return (SERVICES as readonly any[]).filter((s) => (cat === "ALL" || s.cat === cat) && (!kw || (s.name + s.cat).toLowerCase().includes(kw)));
+    }, [q, cat]);
+    const itemsSubtotal = useMemo(() => items.reduce((a, b) => a + b.price * b.qty, 0), [items]);
+
+    // 計算
+    const legalTotal = legal.jibaiseki24m.unit * legal.jibaiseki24m.qty
+        + legal.weightTax.unit * legal.weightTax.qty
+        + legal.stamp.unit * legal.stamp.qty;        // ① 非課税
+    const extrasTotal = fees.partsExchangeTech.unit * fees.partsExchangeTech.qty
+        + fees.proxy.unit * fees.proxy.qty
+        + fees.basic.unit * fees.basic.qty;     // 技術料等（課税）
+    const nonTaxable = legalTotal;                                       // ①
+    const taxableBase = itemsSubtotal + extrasTotal;                     // ②
+    const taxableAfterDiscount = Math.max(0, taxableBase - Math.max(0, fees.discount || 0));
+    const grandTotal = nonTaxable + taxableAfterDiscount;                // ①+②（値引き後）
+    const finalDue = Math.max(0, grandTotal - Math.max(0, fees.deposit || 0));
+
+    // 追加・削除
+    function addItem(svc: any) {
+        const usingBringIn = !!useBringIn[svc.id];
+        const price = (usingBringIn && typeof svc.bringIn === "number") ? svc.bringIn : svc.price;
+        const qn = Math.max(1, Number(qtyDraft[svc.id] || 1));
+        setItems((prev) => {
+            const idx = prev.findIndex((p) => p.id === svc.id && p.price === price);
+            if (idx !== -1) { const next = [...prev]; next[idx] = { ...next[idx], qty: next[idx].qty + qn }; return next; }
+            return [...prev, { id: svc.id, name: svc.name, price, qty: qn, notes: svc.notes || "", cat: svc.cat }];
+        });
+        setQtyDraft((d) => ({ ...d, [svc.id]: 1 }));
+    }
+    function removeItem(i: number) { setItems((prev) => prev.filter((_, idx) => idx !== i)); }
+    function updateQty(i: number, v: string) {
+        const n = Math.max(1, Number(v || 1));
+        setItems((prev) => prev.map((x, idx) => idx === i ? { ...x, qty: n } : x));
+    }
+
+    // ダウンロード共通
+    function downloadBlob(filename: string, blob: Blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // ==================== Excel 出力 ====================
+    async function exportExcel() {
+        try {
+            const mod: any = await import("xlsx-populate/browser/xlsx-populate");
+            const XlsxPopulate = mod.default || mod;
+
+            const res = await fetch("/templates/shaken_template.xlsx", { cache: "no-store" });
+            if (!res.ok) { alert("テンプレートが見つかりません。/public/templates/shaken_template.xlsx を配置してください。"); return; }
+            const ab = await res.arrayBuffer();
+            const wb = await XlsxPopulate.fromDataAsync(ab);
+
+            let sheet: any = wb.sheets().find((s: any) => String(s.cell("A1").value() ?? "").includes("見積書")) || wb.sheet(0);
+            const moneyFmt = '"¥"#,##0;-"¥"#,##0';
+
+            // ---- 上部：宛名・日付・車両 ----
+            sheet.cell("A2").value(client.name || "");
+            const d = meta.date ? new Date(meta.date) : new Date();
+            sheet.cell("F2").value(d).style("numberFormat", "yyyy/m/d");
+            sheet.cell("B3").value(vehicle.registrationNo || "");
+            sheet.cell("D3").value(vehicle.modelCode || "");
+            sheet.cell("B4").value(vehicle.model || "");
+            sheet.cell("D4").value(vehicle.vin || "");
+            sheet.cell("B5").value(vehicle.mileage ? `${vehicle.mileage} km` : "　km");
+            sheet.cell("D5").value(vehicle.engineModel || "");
+            sheet.cell("B6").value(vehicle.firstReg || "");
+            sheet.cell("D6").value(vehicle.nextInspection || "");
+
+            // ---- 法定費用（非課税）：D=単価 / E=個数 / F=金額 ----
+            const L9 = Number(legal.jibaiseki24m.unit || 0) * Number(legal.jibaiseki24m.qty || 0);
+            const L10 = Number(legal.weightTax.unit || 0) * Number(legal.weightTax.qty || 0);
+            const L11 = Number(legal.stamp.unit || 0) * Number(legal.stamp.qty || 0);
+
+            sheet.cell("D9").value(Number(legal.jibaiseki24m.unit || 0)).style("numberFormat", moneyFmt);
+            sheet.cell("E9").value(Number(legal.jibaiseki24m.qty || 0)).style("numberFormat", "0");
+            sheet.cell("F9").value(L9).style("numberFormat", moneyFmt);
+
+            sheet.cell("D10").value(Number(legal.weightTax.unit || 0)).style("numberFormat", moneyFmt);
+            sheet.cell("E10").value(Number(legal.weightTax.qty || 0)).style("numberFormat", "0");
+            sheet.cell("F10").value(L10).style("numberFormat", moneyFmt);
+
+            sheet.cell("D11").value(Number(legal.stamp.unit || 0)).style("numberFormat", moneyFmt);
+            sheet.cell("E11").value(Number(legal.stamp.qty || 0)).style("numberFormat", "0");
+            sheet.cell("F11").value(L11).style("numberFormat", moneyFmt);
+
+            // ---- 明細（A15:F36想定）→ 未使用行は非表示 ----
+            const START = 15, TEMPLATE_ROWS = 22, END = START + TEMPLATE_ROWS - 1;
+            const used = Math.min(items.length, TEMPLATE_ROWS);
+
+            for (let r = START; r <= END; r++) {
+                sheet.row(r).hidden(false);
+                // ★ F列（テンプレ式）を守るため、A〜Eのみ初期化
+                ["A", "B", "C", "D", "E"].forEach(col => sheet.cell(`${col}${r}`).value(null));
+            }
+
+            for (let i = 0; i < used; i++) {
+                const it = items[i];
+                const r = START + i;
+                const qty = Math.max(0, Number(it.qty || 0));
+                const price = Number(it.price || 0);
+
+                sheet.cell(`A${r}`).value(qty > 1 ? `×${qty}` : (qty > 0 ? "✓" : ""));
+                sheet.cell(`B${r}`).value(it.name || "");
+                sheet.cell(`D${r}`).value(price).style("numberFormat", moneyFmt);
+                sheet.cell(`E${r}`).value(qty).style("numberFormat", "0");
+                // ★ 明細Fはテンプレの式に任せるため書き込まない
+                // sheet.cell(`F${r}`).value(price * qty) ... は書かない
+            }
+            for (let r = START + used; r <= END; r++) sheet.row(r).hidden(true);
+
+            // ---- 技術料など（課税）：D=単価 / E=個数（Fは式に任せる）----
+            sheet.cell("D37").value(Number(fees.partsExchangeTech.unit || 0)).style("numberFormat", moneyFmt);
+            sheet.cell("E37").value(Number(fees.partsExchangeTech.qty || 0)).style("numberFormat", "0");
+            // ★ F37は書かない
+
+            sheet.cell("D38").value(Number(fees.proxy.unit || 0)).style("numberFormat", moneyFmt);
+            sheet.cell("E38").value(Number(fees.proxy.qty || 0)).style("numberFormat", "0");
+            // ★ F38は書かない
+
+            sheet.cell("D39").value(Number(fees.basic.unit || 0)).style("numberFormat", moneyFmt);
+            sheet.cell("E39").value(Number(fees.basic.qty || 0)).style("numberFormat", "0");
+            // ★ F39は書かない
+
+            // ===== ラベル探索（値引き/預り金 用）=====
+            const usedRange = () => {
+                const rng = sheet.usedRange();
+                return {
+                    values: rng.value() as any[][],
+                    startRow: rng.startCell().rowNumber(),
+                    startCol: rng.startCell().columnNumber(),
+                };
+            };
+            const norm = (s: string) => String(s).replace(/\s+/g, "");
+
+            function findLabelCell(
+                matchers: (string | RegExp)[],
+                opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
+            ) {
+                const { values, startRow, startCol } = usedRange();
+                const rStart = opt?.searchFromBottom ? values.length - 1 : 0;
+                const rEnd = opt?.searchFromBottom ? -1 : values.length;
+                const rStep = opt?.searchFromBottom ? -1 : 1;
+                for (let i = rStart; i !== rEnd; i += rStep) {
+                    const rowNumber = startRow + i;
+                    if (opt?.rowMin && rowNumber < opt.rowMin) continue;
+                    if (opt?.rowMax && rowNumber > opt.rowMax) continue;
+                    const rowVals = values[i];
+                    for (let j = 0; j < rowVals.length; j++) {
+                        const v = rowVals[j];
+                        if (typeof v !== "string") continue;
+                        const s = norm(v);
+                        const hit = matchers.some(m => typeof m === "string" ? s.includes(norm(m)) : (m as RegExp).test(s));
+                        if (hit) return { row: rowNumber, col: startCol + j };
+                    }
+                }
+                return null;
+            }
+
+            // ★ 結合セルを飛ばして金額欄（右端の実セル）へ入れる
+            function writeRightOfLabelSmart(
+                matchers: (string | RegExp)[],
+                val: number,
+                money = true,
+                opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
+            ) {
+                const pos = findLabelCell(matchers, opt);
+                if (!pos) { console.warn("label not found:", matchers); return; }
+                let c = pos.col + 1;
+                // 候補を右に走査して、最初の “値が入っている or 数式セル or 既定の金額列” を探す
+                for (let step = 0; step < 6; step++) {
+                    const cell = sheet.cell(pos.row, c);
+                    // 数式がある列（たとえばF列）や、既に値が入る金額列を優先
+                    if (cell.formula && typeof cell.formula() === "string") break;
+                    // 空セルが連続する（結合の影）場合はさらに右へ
+                    if (cell.value() == null || cell.value() === "") { c++; continue; }
+                    // 何か文字列（ラベル）の場合はさらに右へ
+                    if (typeof cell.value() === "string") { c++; continue; }
+                    break;
+                }
+                sheet.cell(pos.row, c).value(val).style("numberFormat", money ? moneyFmt : "0");
+            }
+
+            // ★ 上部/下部のラベル周りには一切書かない（テンプレの式に任せる）
+            // writeRightOfLabel([...]) / writeBelowOfLabel([...]) は使用しない
+
+            // 値引き・預り金のみ投入（テンプレ式が最終合計に反映）
+            writeRightOfLabelSmart(["調整値引き"], Number(fees.discount || 0), true, { searchFromBottom: true });
+            writeRightOfLabelSmart(["預り金"], Number(fees.deposit || 0), true, { searchFromBottom: true });
+
+            // 会社情報（任意）
+            if (settings.company.address) sheet.cell("B46").value(settings.company.address);
+            if (settings.company.name) sheet.cell("B47").value(settings.company.name);
+
+            const out = await wb.outputAsync();
+            downloadBlob(`estimate_${meta.invoiceNo}.xlsx`,
+                new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+            );
+        } catch (e: any) {
+            console.error(e);
+            alert(`Excel出力でエラーが発生しました。\n${e?.message ?? e}`);
+        }
+    }
+
+
+    // --------------------------- UI ---------------------------
+    return (
+        <div className="min-h-screen bg-slate-50 text-slate-800 overflow-x-hidden">
+            {/* ヘッダ */}
+            <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-slate-200">
+                <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+                    <img
+                        src={settings.company.logoUrl || "/logo.png"}
+                        alt="logo"
+                        className="w-9 h-9 rounded object-cover ring-1 ring-slate-200"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="font-semibold">車検整備 見積書ビルダー</div>
+                    <div className="ml-auto text-xs text-slate-600">{settings.company.address} ｜ {settings.company.phone}</div>
+                    <button type="button" onClick={() => setShowSettings(true)} className="ml-3 px-2.5 py-1.5 rounded-lg border text-xs bg-white hover:bg-slate-50">
+                        設定
+                    </button>
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-4">
+                {/* 左：検索・顧客・車両 */}
+                <section className="md:col-span-3">
+                    <div className="bg-white rounded-2xl shadow-sm border p-3">
+                        <div className="text-sm font-semibold mb-2">品目検索</div>
+                        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="キーワード検索" className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" />
+                        <div className="mt-3 text-sm font-semibold mb-1">カテゴリー</div>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.map((c) => (
+                                <button key={c} type="button" onClick={() => setCat(c)} className={`px-3 py-1.5 rounded-full border text-xs ${cat === c ? "bg-sky-600 text-white border-sky-600" : "bg-white hover:bg-slate-100"}`}>
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border p-3 mt-4">
+                        <div className="text-sm font-semibold mb-2">顧客情報</div>
+                        <div className="grid gap-2 text-sm">
+                            <input className="border rounded-lg px-3 py-2" placeholder="宛名（氏名/会社）" value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} />
+                            <input className="border rounded-lg px-3 py-2" placeholder="電話" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} />
+                            <input className="border rounded-lg px-3 py-2" placeholder="Email" value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} />
+                            <input className="border rounded-lg px-3 py-2" placeholder="住所" value={client.address} onChange={(e) => setClient({ ...client, address: e.target.value })} />
+                        </div>
+
+                        <div className="text-sm font-semibold mt-4 mb-2">車両情報</div>
+                        <div className="grid gap-2 text-sm">
+                            <input className="border rounded-lg px-3 py-2" placeholder="登録番号" value={vehicle.registrationNo} onChange={(e) => setVehicle({ ...vehicle, registrationNo: e.target.value })} />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input className="border rounded-lg px-3 py-2" placeholder="車名" value={vehicle.model} onChange={(e) => setVehicle({ ...vehicle, model: e.target.value })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="型式" value={vehicle.modelCode} onChange={(e) => setVehicle({ ...vehicle, modelCode: e.target.value })} />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input className="border rounded-lg px-3 py-2" placeholder="車台番号" value={vehicle.vin} onChange={(e) => setVehicle({ ...vehicle, vin: e.target.value })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="原動機型式" value={vehicle.engineModel} onChange={(e) => setVehicle({ ...vehicle, engineModel: e.target.value })} />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input className="border rounded-lg px-3 py-2" placeholder="走行距離 (km)" value={vehicle.mileage} onChange={(e) => setVehicle({ ...vehicle, mileage: e.target.value })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="初年度登録" value={vehicle.firstReg} onChange={(e) => setVehicle({ ...vehicle, firstReg: e.target.value })} />
+                            </div>
+                            <input className="border rounded-lg px-3 py-2" placeholder="次回車検有効期限" value={vehicle.nextInspection} onChange={(e) => setVehicle({ ...vehicle, nextInspection: e.target.value })} />
+                        </div>
+
+                        {/* 法定費用（非課税） 単価/個数 */}
+                        <div className="text-sm font-semibold mt-4 mb-2">法定費用（非課税）</div>
+                        <div className="grid gap-2 text-sm">
+                            {/* 行レイアウト: 品目 / 単価 / 個数 / 金額 */}
+                            {[
+                                { key: "jibaiseki24m", label: "自賠責保険24ヶ月" },
+                                { key: "weightTax", label: "重量税" },
+                                { key: "stamp", label: "印紙代" },
+                            ].map(({ key, label }) => (
+                                <div key={key} className="grid grid-cols-12 items-center gap-2">
+                                    <span className="col-span-6 sm:col-span-5">{label}</span>
+                                    <input
+                                        type="text" inputMode="numeric" pattern="\d*"
+                                        className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
+                                        placeholder="単価"
+                                        value={(legalDraft as any)[key].unit}
+                                        onChange={(e) => setLegalDraft((p: any) => ({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,]/g, '') } }))}
+                                        onBlur={() => setLegal((p: any) => ({ ...p, [key]: { unit: toNum((legalDraft as any)[key].unit), qty: p[key].qty } }))}
+                                    />
+                                    <input
+                                        type="text" inputMode="numeric" pattern="\d*"
+                                        className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
+                                        placeholder="個数"
+                                        value={(legalDraft as any)[key].qty}
+                                        onChange={(e) => setLegalDraft((p: any) => ({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,]/g, '') } }))}
+                                        onBlur={() => setLegal((p: any) => ({ ...p, [key]: { unit: p[key].unit, qty: toNum((legalDraft as any)[key].qty) } }))}
+                                    />
+                                    <div className="col-span-12 sm:col-span-2 text-right">
+                                        {key === "jibaiseki24m" && yen(legal.jibaiseki24m.unit * legal.jibaiseki24m.qty)}
+                                        {key === "weightTax" && yen(legal.weightTax.unit * legal.weightTax.qty)}
+                                        {key === "stamp" && yen(legal.stamp.unit * legal.stamp.qty)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* 中央：品目追加 */}
+                <section className="md:col-span-5">
+                    <div className="bg-white rounded-2xl shadow-sm border p-3">
+                        <div className="text-sm font-semibold mb-2">品目一覧（{filtered.length}件）</div>
+                        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="品目検索" className="w-full rounded-xl border px-3 py-2 text-sm mb-3" />
+                        <div className="grid gap-3">
+                            {filtered.map((s: any) => (
+                                <div key={s.id} className="border rounded-xl p-3 hover:shadow-sm">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="font-medium">{s.name}</div>
+                                            <div className="text-xs text-slate-500">{s.cat}</div>
+                                        </div>
+                                        <div className="text-right text-sm">
+                                            <div>通常: <span className="font-semibold">{yen(s.price)}</span></div>
+                                            {typeof s.bringIn === "number" && <div className="mt-0.5">持込: <span className="font-semibold">{yen(s.bringIn)}</span></div>}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-3 mt-3">
+                                        {typeof s.bringIn === "number" && (
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <input type="checkbox" checked={!!useBringIn[s.id]} onChange={(e) => setUseBringIn({ ...useBringIn, [s.id]: (e.target as HTMLInputElement).checked })} />
+                                                <span>部品持込工賃を使う</span>
+                                            </label>
+                                        )}
+                                        <div className="flex items-center gap-2 ml-auto">
+                                            <input type="number" min={1} value={qtyDraft[s.id] ?? 1} onChange={(e) => setQtyDraft({ ...qtyDraft, [s.id]: (e.target as HTMLInputElement).value })} className="w-24 border rounded-lg px-3 py-1.5 text-sm" />
+                                            <button type="button" onClick={() => addItem(s)} className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">追加</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* 右：プレビュー & 出力 */}
+                <section className="md:col-span-4">
+                    <div className="bg-white rounded-2xl shadow-sm border p-3">
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold">見積プレビュー</div>
+                            <button type="button" onClick={() => setItems([])} className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">明細クリア</button>
+                        </div>
+
+                        <div className="mt-2 border rounded-xl divide-y">
+                            {items.length === 0 && <div className="p-4 text-sm text-slate-500">品目を追加するとここに表示されます。</div>}
+                            {items.map((it, idx) => (
+                                <div key={idx} className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-sm break-words">{it.name}</div>
+                                        <div className="text-xs text-slate-500">{it.cat} / 単価 {yen(it.price)}</div>
+                                    </div>
+                                    <input type="number" min={1} value={it.qty} onChange={(e) => updateQty(idx, (e.target as HTMLInputElement).value)} className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
+                                    <div className="w-28 text-right text-sm font-semibold">{yen(it.price * it.qty)}</div>
+                                    <button type="button" onClick={() => removeItem(idx)} className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100">削除</button>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 技術料など（課税） 単価/個数 */}
+                        <div className="mt-4 grid gap-2 text-sm">
+                            {[
+                                { key: "partsExchangeTech", label: "部品交換技術料" },
+                                { key: "proxy", label: "車検代行料" },
+                                { key: "basic", label: "車検整備基本料" },
+                            ].map(({ key, label }) => (
+                                <div key={key} className="grid grid-cols-12 items-center gap-2">
+                                    <span className="col-span-6 sm:col-span-5">{label}</span>
+                                    <input
+                                        type="text" inputMode="numeric" pattern="\d*"
+                                        className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
+                                        placeholder="単価"
+                                        value={(feesDraft as any)[key].unit}
+                                        onChange={(e) => setFeesDraft((p: any) => ({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,]/g, '') } }))}
+                                        onBlur={() => setFees((p: any) => ({ ...p, [key]: { unit: toNum((feesDraft as any)[key].unit), qty: p[key].qty } }))}
+                                    />
+                                    <input
+                                        type="text" inputMode="numeric" pattern="\d*"
+                                        className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
+                                        placeholder="個数"
+                                        value={(feesDraft as any)[key].qty}
+                                        onChange={(e) => setFeesDraft((p: any) => ({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,]/g, '') } }))}
+                                        onBlur={() => setFees((p: any) => ({ ...p, [key]: { unit: p[key].unit, qty: toNum((feesDraft as any)[key].qty) } }))}
+                                    />
+                                    <div className="col-span-12 sm:col-span-2 text-right font-semibold">
+                                        {key === "partsExchangeTech" && yen(fees.partsExchangeTech.unit * fees.partsExchangeTech.qty)}
+                                        {key === "proxy" && yen(fees.proxy.unit * fees.proxy.qty)}
+                                        {key === "basic" && yen(fees.basic.unit * fees.basic.qty)}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* 値引き・預り金（金額） */}
+                            <div className="grid grid-cols-12 items-center gap-2">
+                                <span className="col-span-6 sm:col-span-5">調整値引き</span>
+                                <input
+                                    type="text" inputMode="numeric" pattern="\d*"
+                                    className="col-span-6 sm:col-span-7 w-full border rounded px-3 py-1.5 text-right"
+                                    value={feesDraft.discount}
+                                    onChange={(e) => setFeesDraft({ ...feesDraft, discount: e.target.value.replace(/[^\d,]/g, '') })}
+                                    onBlur={() => setFees({ ...fees, discount: toNum(feesDraft.discount) })}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="grid grid-cols-12 items-center gap-2">
+                                <span className="col-span-6 sm:col-span-5">預り金</span>
+                                <input
+                                    type="text" inputMode="numeric" pattern="\d*"
+                                    className="col-span-6 sm:col-span-7 w-full border rounded px-3 py-1.5 text-right"
+                                    value={feesDraft.deposit}
+                                    onChange={(e) => setFeesDraft({ ...feesDraft, deposit: e.target.value.replace(/[^\d,]/g, '') })}
+                                    onBlur={() => setFees({ ...fees, deposit: toNum(feesDraft.deposit) })}
+                                    placeholder="0"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between"><div>非課税小計(法定費用)</div><div className="font-semibold">{yen(nonTaxable)}</div></div>
+                            <div className="flex items-center justify-between"><div>10%対象合計(値引前)</div><div className="font-semibold">{yen(taxableBase)}</div></div>
+                            <div className="flex items-center justify-between"><div>合計(①+②)</div><div className="font-semibold">{yen(nonTaxable + taxableBase)}</div></div>
+                            <div className="flex items-center justify-between text-base mt-1">
+                                <div className="font-semibold">差引合計</div>
+                                <div className="font-bold text-lg">{yen(finalDue)}</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => exportExcel()}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+                            >
+                                Excel(.xlsx)に出力
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            {/* 設定モーダル */}
+            {showSettings && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setShowSettings(false)}>
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4 border-b flex items-center justify-between">
+                            <div className="font-semibold">事業者情報・税設定</div>
+                            <button type="button" className="text-sm px-3 py-1 rounded border" onClick={() => setShowSettings(false)}>閉じる</button>
+                        </div>
+                        <div className="p-4 grid md:grid-cols-2 gap-4 text-sm">
+                            <div className="grid gap-2">
+                                <div className="font-medium text-slate-700">事業者情報</div>
+                                <input className="border rounded-lg px-3 py-2" placeholder="屋号" value={settings.company.name} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, name: (e.target as HTMLInputElement).value } })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="住所" value={settings.company.address} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, address: (e.target as HTMLInputElement).value } })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="電話" value={settings.company.phone} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, phone: (e.target as HTMLInputElement).value } })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="振込（銀行名 支店 種別 口座名義 など）" value={settings.company.bank} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, bank: (e.target as HTMLInputElement).value } })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="ロゴURL (/logo.png など)" value={settings.company.logoUrl} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, logoUrl: (e.target as HTMLInputElement).value } })} />
+                            </div>
+                            <div className="grid gap-2">
+                                <div className="font-medium text-slate-700">見積情報</div>
+                                <input className="border rounded-lg px-3 py-2" placeholder="日付" type="date" value={meta.date} onChange={(e) => setMeta({ ...meta, date: (e.target as HTMLInputElement).value })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="見積番号" value={meta.invoiceNo} onChange={(e) => setMeta({ ...meta, invoiceNo: (e.target as HTMLInputElement).value })} />
+                                <div className="text-xs text-slate-500">※ 税は内税想定。Excelは添付テンプレに準拠。</div>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t text-right">
+                            <button type="button" className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm hover:bg-sky-700" onClick={() => setShowSettings(false)}>OK</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <footer className="max-w-7xl mx-auto px-4 pb-8 mt-4 text-xs text-slate-500"></footer>
+        </div>
+    );
+}
