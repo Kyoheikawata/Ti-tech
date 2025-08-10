@@ -91,20 +91,20 @@ export async function POST(req: Request) {
   sheet.cell("D6").value(data.vehicle.nextInspection || "");
 
   // ---- 法定費用（非課税）：D=単価 / E=個数 / F=金額 ----
-  const L9  = Number(data.legal.jibaiseki24m.unit||0) * Number(data.legal.jibaiseki24m.qty||0);
-  const L10 = Number(data.legal.weightTax.unit||0)    * Number(data.legal.weightTax.qty||0);
-  const L11 = Number(data.legal.stamp.unit||0)        * Number(data.legal.stamp.qty||0);
+  const L9 = Number(data.legal.jibaiseki24m.unit || 0) * Number(data.legal.jibaiseki24m.qty || 0);
+  const L10 = Number(data.legal.weightTax.unit || 0) * Number(data.legal.weightTax.qty || 0);
+  const L11 = Number(data.legal.stamp.unit || 0) * Number(data.legal.stamp.qty || 0);
 
-  sheet.cell("D9").value(Number(data.legal.jibaiseki24m.unit||0)).style("numberFormat", moneyFmt);
-  sheet.cell("E9").value(Number(data.legal.jibaiseki24m.qty ||0)).style("numberFormat", "0");
+  sheet.cell("D9").value(Number(data.legal.jibaiseki24m.unit || 0)).style("numberFormat", moneyFmt);
+  sheet.cell("E9").value(Number(data.legal.jibaiseki24m.qty || 0)).style("numberFormat", "0");
   sheet.cell("F9").value(L9).style("numberFormat", moneyFmt);
 
-  sheet.cell("D10").value(Number(data.legal.weightTax.unit||0)).style("numberFormat", moneyFmt);
-  sheet.cell("E10").value(Number(data.legal.weightTax.qty ||0)).style("numberFormat", "0");
+  sheet.cell("D10").value(Number(data.legal.weightTax.unit || 0)).style("numberFormat", moneyFmt);
+  sheet.cell("E10").value(Number(data.legal.weightTax.qty || 0)).style("numberFormat", "0");
   sheet.cell("F10").value(L10).style("numberFormat", moneyFmt);
 
-  sheet.cell("D11").value(Number(data.legal.stamp.unit||0)).style("numberFormat", moneyFmt);
-  sheet.cell("E11").value(Number(data.legal.stamp.qty ||0)).style("numberFormat", "0");
+  sheet.cell("D11").value(Number(data.legal.stamp.unit || 0)).style("numberFormat", moneyFmt);
+  sheet.cell("E11").value(Number(data.legal.stamp.qty || 0)).style("numberFormat", "0");
   sheet.cell("F11").value(L11).style("numberFormat", moneyFmt);
 
   // ---- 明細（A15:F36想定）→ 未使用行は非表示 ----
@@ -113,13 +113,13 @@ export async function POST(req: Request) {
 
   for (let r = START; r <= END; r++) {
     sheet.row(r).hidden(false);
-    ["A","B","C","D","E"].forEach(col => sheet.cell(`${col}${r}`).value(null)); // F列(式)は触らない
+    ["A", "B", "C", "D", "E"].forEach(col => sheet.cell(`${col}${r}`).value(null)); // F列(式)は触らない
   }
 
   for (let i = 0; i < used; i++) {
     const it = data.items[i];
-    const r  = START + i;
-    const qty   = Math.max(0, Number(it.qty || 0));
+    const r = START + i;
+    const qty = Math.max(0, Number(it.qty || 0));
     const price = Number(it.price || 0);
 
     sheet.cell(`A${r}`).value(qty > 1 ? `×${qty}` : (qty > 0 ? "✓" : ""));
@@ -132,12 +132,12 @@ export async function POST(req: Request) {
   for (let r = START + used; r <= END; r++) sheet.row(r).hidden(true);
 
   // ---- 技術料など（課税）：D=単価 / E=個数（Fは式に任せる）----
-  sheet.cell("D37").value(Number(data.fees.partsExchangeTech.unit||0)).style("numberFormat", moneyFmt);
-  sheet.cell("E37").value(Number(data.fees.partsExchangeTech.qty ||0)).style("numberFormat", "0");
-  sheet.cell("D38").value(Number(data.fees.proxy.unit||0)).style("numberFormat", moneyFmt);
-  sheet.cell("E38").value(Number(data.fees.proxy.qty ||0)).style("numberFormat", "0");
-  sheet.cell("D39").value(Number(data.fees.basic.unit||0)).style("numberFormat", moneyFmt);
-  sheet.cell("E39").value(Number(data.fees.basic.qty ||0)).style("numberFormat", "0");
+  sheet.cell("D37").value(Number(data.fees.partsExchangeTech.unit || 0)).style("numberFormat", moneyFmt);
+  sheet.cell("E37").value(Number(data.fees.partsExchangeTech.qty || 0)).style("numberFormat", "0");
+  sheet.cell("D38").value(Number(data.fees.proxy.unit || 0)).style("numberFormat", moneyFmt);
+  sheet.cell("E38").value(Number(data.fees.proxy.qty || 0)).style("numberFormat", "0");
+  sheet.cell("D39").value(Number(data.fees.basic.unit || 0)).style("numberFormat", moneyFmt);
+  sheet.cell("E39").value(Number(data.fees.basic.qty || 0)).style("numberFormat", "0");
 
   // ---- 調整値引き／預り金（該当行のF列＝金額列に直接）----
   const usedRange = () => {
@@ -150,13 +150,13 @@ export async function POST(req: Request) {
   };
   const norm = (s: string) => String(s).replace(/\s+/g, "");
   function findLabelCell(
-    matchers: (string|RegExp)[],
+    matchers: (string | RegExp)[],
     opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
-  ): {row:number; col:number} | null {
+  ): { row: number; col: number } | null {
     const { values, startRow, startCol } = usedRange();
     const rStart = opt?.searchFromBottom ? values.length - 1 : 0;
-    const rEnd   = opt?.searchFromBottom ? -1 : values.length;
-    const rStep  = opt?.searchFromBottom ? -1 : 1;
+    const rEnd = opt?.searchFromBottom ? -1 : values.length;
+    const rStep = opt?.searchFromBottom ? -1 : 1;
     for (let i = rStart; i !== rEnd; i += rStep) {
       const rowNumber = startRow + i;
       if (opt?.rowMin && rowNumber < opt.rowMin) continue;
@@ -172,67 +172,72 @@ export async function POST(req: Request) {
     }
     return null;
   }
-  function writeAmountF(matchers: (string|RegExp)[], val: number) {
+  function writeAmountF(matchers: (string | RegExp)[], val: number) {
     const pos = findLabelCell(matchers, { searchFromBottom: true });
     if (!pos) return;
     sheet.cell(`F${pos.row}`).value(val).style("numberFormat", moneyFmt);
   }
-  writeAmountF(["調整値引き"], Number(data.fees.discount||0));
-  writeAmountF(["預り金"],     Number(data.fees.deposit ||0));
+  writeAmountF(["調整値引き"], Number(data.fees.discount || 0));
+  writeAmountF(["預り金"], Number(data.fees.deposit || 0));
 
   // 会社情報（任意）
   if (data.settings.company.address) sheet.cell("B46").value(data.settings.company.address);
-  if (data.settings.company.name)    sheet.cell("B47").value(data.settings.company.name);
+  if (data.settings.company.name) sheet.cell("B47").value(data.settings.company.name);
 
 
 
   // 出力 & ダウンロードレスポンス
-// ===== xlsx-populate でセル書き込み完了 =====
-const out = await wb.outputAsync(); // ArrayBuffer | Uint8Array
+  // ===== xlsx-populate でセル書き込み完了 =====
+  const out = await wb.outputAsync(); // ArrayBuffer | Uint8Array
 
-// xlsx-populate の出力を ArrayBuffer に正規化（新規にコピー）
-const toArrayBuffer = (x: ArrayBuffer | Uint8Array): ArrayBuffer => {
-  const src = x instanceof ArrayBuffer ? new Uint8Array(x) : x;
-  const ab = new ArrayBuffer(src.byteLength);
-  new Uint8Array(ab).set(src);
-  return ab;
-};
-const ab = toArrayBuffer(out);
+  // xlsx-populate の出力を ArrayBuffer に正規化（新規にコピー）
+  const toArrayBuffer = (x: ArrayBuffer | Uint8Array): ArrayBuffer => {
+    const src = x instanceof ArrayBuffer ? new Uint8Array(x) : x;
+    const ab = new ArrayBuffer(src.byteLength);
+    new Uint8Array(ab).set(src);
+    return ab;
+  };
+  const ab = toArrayBuffer(out);
 
-// ===== ExcelJS でロゴを “セルにアンカー” して再挿入 =====
-const book = new Workbook();
-await book.xlsx.load(ab);
-const images = typeof ws.getImages === "function" ? ws.getImages() : [];
-for (const im of images) ws.removeImage(im.imageId);
-// シート特定（A1に「見積書」を含むシート、なければ先頭）
-const ws =
-  book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
-  book.worksheets[0];
+  // ===== ExcelJS でロゴを “セルにアンカー” して再挿入 =====
+  const book = new Workbook();
+  await book.xlsx.load(ab);
+  const ws =
+    book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
+    book.worksheets[0];
 
-try {
-const logoPath = path.join(process.cwd(), "public", "logo.png");
-const logoBuf  = await readFile(logoPath);
-const logoB64  = "data:image/png;base64," + logoBuf.toString("base64"); // ★base64化
-const imgId = book.addImage({ base64: logoB64, extension: "png" });     // ★buffer→base64
+  // ✅ 既存画像の全削除（Numbers対策）
+  const images = typeof (ws as unknown as { getImages?: () => Array<{ imageId: number }> }).getImages === "function"
+    ? (ws as unknown as { getImages: () => Array<{ imageId: number }> }).getImages()
+    : [];
+  for (const im of images) {
+    (ws as unknown as { removeImage: (id: number) => void }).removeImage(im.imageId);
+  }
 
-  // ★ ロゴ位置：テンプレと同じセル範囲にアンカー
-  //    例) B49:F53（0始まり指定なので B→col:1, 行49→row:48）
-ws.addImage(imgId, "A44:A49");
-} catch (e) {
-  console.warn("logo insert skipped:", e);
-}
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    const logoBuf = await readFile(logoPath);
+    const logoB64 = "data:image/png;base64," + logoBuf.toString("base64"); // ★base64化
+    const imgId = book.addImage({ base64: logoB64, extension: "png" });     // ★buffer→base64
 
-// 最終バイナリを返す
-const finalAb = await book.xlsx.writeBuffer(); // ArrayBuffer（環境により Uint8Array のことも）
-const body =
-  finalAb instanceof ArrayBuffer ? finalAb : toArrayBuffer(finalAb as Uint8Array);
+    // ★ ロゴ位置：テンプレと同じセル範囲にアンカー
+    //    例) B49:F53（0始まり指定なので B→col:1, 行49→row:48）
+    ws.addImage(imgId, "A44:A49");
+  } catch (e) {
+    console.warn("logo insert skipped:", e);
+  }
 
-return new Response(body, {
-  headers: {
-    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "Content-Disposition": `attachment; filename="estimate_${data.meta.invoiceNo}.xlsx"`,
-    "Cache-Control": "no-store",
-  },
-});
+  // 最終バイナリを返す
+  const finalAb = await book.xlsx.writeBuffer(); // ArrayBuffer（環境により Uint8Array のことも）
+  const body =
+    finalAb instanceof ArrayBuffer ? finalAb : toArrayBuffer(finalAb as Uint8Array);
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="estimate_${data.meta.invoiceNo}.xlsx"`,
+      "Cache-Control": "no-store",
+    },
+  });
 
 }
