@@ -183,6 +183,24 @@ export async function POST(req: Request) {
   if (data.settings.company.address) sheet.cell("B46").value(data.settings.company.address);
   if (data.settings.company.name)    sheet.cell("B47").value(data.settings.company.name);
 
+  try {
+  const logoPath = path.join(process.cwd(), "public", "logo.png");
+  const logoBin  = await readFile(logoPath);
+  const logoB64  = "data:image/png;base64," + logoBin.toString("base64");
+
+  // ★ テンプレと同じ位置に合わせる：B49:F53（必要に応じて調整）
+  //    from: { row: 行番号, col: 列番号 }  ※A=1, B=2 ...
+  (sheet as any).addImage?.({
+    image: logoB64,
+    name: "ti-tech-logo",
+    from: { row: 49, col: 2 },   // B49
+    to:   { row: 53, col: 6 },   // F53
+  });
+} catch (e) {
+  // ロゴが無くても出力は継続
+  console.warn("logo insert skipped:", e);
+}
+
   // 出力 & ダウンロードレスポンス
 const out = await wb.outputAsync(); // ArrayBuffer | Uint8Array
 
