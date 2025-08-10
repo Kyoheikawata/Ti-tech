@@ -154,7 +154,7 @@ await book.xlsx.readFile(templatePath);
     const logoBuf = await readFile(logoPath);
     const imgId = book.addImage({ base64: "data:image/png;base64," + logoBuf.toString("base64"), extension: "png" });
     // ★ テンプレと同じ位置に合わせてください（例: "B49:F53"）
-    ws.addImage(imgId, "B49:F53");
+    ws.addImage(imgId, "A44:A49");
   } catch (e) {
     console.warn("logo insert skipped:", e);
   }
