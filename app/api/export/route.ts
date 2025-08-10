@@ -1,36 +1,11 @@
 // app/api/export/route.ts
-import { Workbook } from "exceljs";
+import { Workbook, Worksheet } from "exceljs";
 import { readFile } from "fs/promises";
 import path from "path";
-export const runtime = "nodejs"; // Node ランタイム必須（ファイルI/O & Buffer）
 
-// ===== xlsx-populate 最小型（unknownベース）=====
-type CellLite = {
-  value(): unknown;
-  value(v: unknown): CellLite;
-  style(key: string, val: unknown): CellLite;
-  formula?: () => string | null;
-};
-type UsedRangeLite = {
-  value(): unknown[][];
-  startCell(): { rowNumber(): number; columnNumber(): number };
-};
-type SheetLite = {
-  cell(ref: string): CellLite;
-  cell(row: number, col: number): CellLite;
-  row(r: number): { hidden(v?: boolean): unknown };
-  usedRange(): UsedRangeLite;
-};
-type WorkbookLite = {
-  sheets(): SheetLite[];
-  sheet(index: number | string): SheetLite;
-  outputAsync(): Promise<ArrayBuffer | Uint8Array>;
-};
-type XlsxPopulateLike = {
-  fromDataAsync: (ab: ArrayBuffer | Uint8Array) => Promise<WorkbookLite>;
-};
+export const runtime = "nodejs";
 
-// ===== アプリ側の型 =====
+// ==== アプリ側の型（そのまま） ====
 type LegalKey = "jibaiseki24m" | "weightTax" | "stamp";
 type QtyUnit = { unit: number; qty: number };
 type Legal = Record<LegalKey, QtyUnit>;
@@ -43,201 +18,165 @@ type Vehicle = {
   registrationNo: string; model: string; modelCode: string; vin: string; engineModel: string;
   mileage: string; firstReg: string; nextInspection: string;
 };
-type Settings = {
-  company: { name: string; address: string; phone: string; bank: string; logoUrl: string };
-  tax: { rate: number };
-};
+type Settings = { company: { name: string; address: string; phone: string; bank: string; logoUrl: string }; tax: { rate: number } };
 type Meta = { date: string; invoiceNo: string };
+type ExportPayload = { client: Client; vehicle: Vehicle; items: Item[]; legal: Legal; fees: Fees; settings: Settings; meta: Meta };
 
-type ExportPayload = {
-  client: Client;
-  vehicle: Vehicle;
-  items: Item[];
-  legal: Legal;
-  fees: Fees;
-  settings: Settings;
-  meta: Meta;
-};
+// 共通
+const moneyFmt = '"¥"#,##0;-"¥"#,##0';
+const toNum = (v: unknown) => (typeof v === "number" ? v : Number(v || 0));
+const norm = (s: string) => String(s).replace(/\s+/g, "");
+
+// ラベル検索（ExcelJS版）
+function findLabelCell(
+  ws: Worksheet,
+  matchers: (string | RegExp)[],
+  opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
+): { row: number; col: number } | null {
+  const rows = ws.actualRowCount || ws.rowCount;
+  const cols = ws.actualColumnCount || ws.columnCount || 60;
+  const rStart = opt?.searchFromBottom ? rows : 1;
+  const rEnd = opt?.searchFromBottom ? 1 : rows;
+  const step = opt?.searchFromBottom ? -1 : 1;
+
+  for (let r = rStart; opt?.searchFromBottom ? r >= rEnd : r <= rEnd; r += step) {
+    if (opt?.rowMin && r < opt.rowMin) continue;
+    if (opt?.rowMax && r > opt.rowMax) continue;
+    for (let c = 1; c <= cols; c++) {
+      const v = ws.getCell(r, c).value;
+      if (typeof v !== "string") continue;
+      const s = norm(v);
+      const hit = matchers.some(m => typeof m === "string" ? s.includes(norm(m)) : (m as RegExp).test(s));
+      if (hit) return { row: r, col: c };
+    }
+  }
+  return null;
+}
 
 export async function POST(req: Request) {
   const data: ExportPayload = await req.json();
 
-  // xlsx-populate（Node）を読み込み
-  const mod = await import("xlsx-populate");
-  const XlsxPopulate: XlsxPopulateLike =
-    ((mod as unknown as { default?: XlsxPopulateLike }).default ?? (mod as unknown as XlsxPopulateLike));
-
-  // テンプレ読込（public/templates/shaken_template.xlsx）
+  // 1) テンプレを exceljs で読込
   const templatePath = path.join(process.cwd(), "public", "templates", "shaken_template.xlsx");
   const templateBuf = await readFile(templatePath);
-  const wb = await XlsxPopulate.fromDataAsync(templateBuf);
-  const moneyFmt = '"¥"#,##0;-"¥"#,##0';
+  const book = new Workbook();
+  await book.xlsx.load(templateBuf);
 
-  // シート選択
-  const candidate = wb.sheets().find((s) => String(s.cell("A1").value() ?? "").includes("見積書"));
-  const sheet = (candidate ?? wb.sheet(0));
+  // 対象シート（A1 に「見積書」を含む / 無ければ先頭）
+  const ws =
+    book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
+    book.worksheets[0];
 
-  // ---- 上部：宛名・日付・車両 ----
-  sheet.cell("A2").value(data.client.name || "");
+  // 2) 上部：宛名・日付・車両
+  ws.getCell("A2").value = data.client.name || "";
   const d = data.meta.date ? new Date(data.meta.date) : new Date();
-  sheet.cell("F2").value(d).style("numberFormat", "yyyy/m/d");
-  sheet.cell("B3").value(data.vehicle.registrationNo || "");
-  sheet.cell("D3").value(data.vehicle.modelCode || "");
-  sheet.cell("B4").value(data.vehicle.model || "");
-  sheet.cell("D4").value(data.vehicle.vin || "");
-  sheet.cell("B5").value(data.vehicle.mileage ? `${data.vehicle.mileage} km` : "　km");
-  sheet.cell("D5").value(data.vehicle.engineModel || "");
-  sheet.cell("B6").value(data.vehicle.firstReg || "");
-  sheet.cell("D6").value(data.vehicle.nextInspection || "");
+  ws.getCell("F2").value = d; ws.getCell("F2").numFmt = "yyyy/m/d";
+  ws.getCell("B3").value = data.vehicle.registrationNo || "";
+  ws.getCell("D3").value = data.vehicle.modelCode || "";
+  ws.getCell("B4").value = data.vehicle.model || "";
+  ws.getCell("D4").value = data.vehicle.vin || "";
+  ws.getCell("B5").value = data.vehicle.mileage ? `${data.vehicle.mileage} km` : "　km";
+  ws.getCell("D5").value = data.vehicle.engineModel || "";
+  ws.getCell("B6").value = data.vehicle.firstReg || "";
+  ws.getCell("D6").value = data.vehicle.nextInspection || "";
 
-  // ---- 法定費用（非課税）：D=単価 / E=個数 / F=金額 ----
-  const L9 = Number(data.legal.jibaiseki24m.unit || 0) * Number(data.legal.jibaiseki24m.qty || 0);
-  const L10 = Number(data.legal.weightTax.unit || 0) * Number(data.legal.weightTax.qty || 0);
-  const L11 = Number(data.legal.stamp.unit || 0) * Number(data.legal.stamp.qty || 0);
+  // 3) 法定費用
+  const L9  = toNum(data.legal.jibaiseki24m.unit) * toNum(data.legal.jibaiseki24m.qty);
+  const L10 = toNum(data.legal.weightTax.unit)    * toNum(data.legal.weightTax.qty);
+  const L11 = toNum(data.legal.stamp.unit)        * toNum(data.legal.stamp.qty);
 
-  sheet.cell("D9").value(Number(data.legal.jibaiseki24m.unit || 0)).style("numberFormat", moneyFmt);
-  sheet.cell("E9").value(Number(data.legal.jibaiseki24m.qty || 0)).style("numberFormat", "0");
-  sheet.cell("F9").value(L9).style("numberFormat", moneyFmt);
+  ws.getCell("D9").value = toNum(data.legal.jibaiseki24m.unit); ws.getCell("D9").numFmt = moneyFmt;
+  ws.getCell("E9").value = toNum(data.legal.jibaiseki24m.qty);  ws.getCell("E9").numFmt = "0";
+  ws.getCell("F9").value = L9;  ws.getCell("F9").numFmt = moneyFmt;
 
-  sheet.cell("D10").value(Number(data.legal.weightTax.unit || 0)).style("numberFormat", moneyFmt);
-  sheet.cell("E10").value(Number(data.legal.weightTax.qty || 0)).style("numberFormat", "0");
-  sheet.cell("F10").value(L10).style("numberFormat", moneyFmt);
+  ws.getCell("D10").value = toNum(data.legal.weightTax.unit); ws.getCell("D10").numFmt = moneyFmt;
+  ws.getCell("E10").value = toNum(data.legal.weightTax.qty);  ws.getCell("E10").numFmt = "0";
+  ws.getCell("F10").value = L10; ws.getCell("F10").numFmt = moneyFmt;
 
-  sheet.cell("D11").value(Number(data.legal.stamp.unit || 0)).style("numberFormat", moneyFmt);
-  sheet.cell("E11").value(Number(data.legal.stamp.qty || 0)).style("numberFormat", "0");
-  sheet.cell("F11").value(L11).style("numberFormat", moneyFmt);
+  ws.getCell("D11").value = toNum(data.legal.stamp.unit); ws.getCell("D11").numFmt = moneyFmt;
+  ws.getCell("E11").value = toNum(data.legal.stamp.qty);  ws.getCell("E11").numFmt = "0";
+  ws.getCell("F11").value = L11; ws.getCell("F11").numFmt = moneyFmt;
 
-  // ---- 明細（A15:F36想定）→ 未使用行は非表示 ----
+  // 4) 明細（A15:F36）
   const START = 15, TEMPLATE_ROWS = 22, END = START + TEMPLATE_ROWS - 1;
   const used = Math.min(data.items.length, TEMPLATE_ROWS);
 
   for (let r = START; r <= END; r++) {
-    sheet.row(r).hidden(false);
-    ["A", "B", "C", "D", "E"].forEach(col => sheet.cell(`${col}${r}`).value(null)); // F列(式)は触らない
+    ws.getRow(r).hidden = false;
+    ["A","B","C","D","E"].forEach(col => { const cell = ws.getCell(`${col}${r}`); cell.value = null; });
   }
 
   for (let i = 0; i < used; i++) {
     const it = data.items[i];
-    const r = START + i;
+    const r  = START + i;
     const qty = Math.max(0, Number(it.qty || 0));
     const price = Number(it.price || 0);
 
-    sheet.cell(`A${r}`).value(qty > 1 ? `×${qty}` : (qty > 0 ? "✓" : ""));
-    sheet.cell(`B${r}`).value(it.name || "");
-    sheet.cell(`D${r}`).value(price).style("numberFormat", moneyFmt);
-    sheet.cell(`E${r}`).value(qty).style("numberFormat", "0");
-    // F列はテンプレの式に任せる
+    ws.getCell(`A${r}`).value = qty > 1 ? `×${qty}` : (qty > 0 ? "✓" : "");
+    ws.getCell(`B${r}`).value = it.name || "";
+    ws.getCell(`D${r}`).value = price; ws.getCell(`D${r}`).numFmt = moneyFmt;
+    ws.getCell(`E${r}`).value = qty;   ws.getCell(`E${r}`).numFmt = "0";
+    // F列はテンプレの式があればそのまま、無ければ式/値は触らない
   }
+  for (let r = START + used; r <= END; r++) ws.getRow(r).hidden = true;
 
-  for (let r = START + used; r <= END; r++) sheet.row(r).hidden(true);
+  // 5) 技術料（D/Eのみ）
+  ws.getCell("D37").value = toNum(data.fees.partsExchangeTech.unit); ws.getCell("D37").numFmt = moneyFmt;
+  ws.getCell("E37").value = toNum(data.fees.partsExchangeTech.qty);  ws.getCell("E37").numFmt = "0";
+  ws.getCell("D38").value = toNum(data.fees.proxy.unit);             ws.getCell("D38").numFmt = moneyFmt;
+  ws.getCell("E38").value = toNum(data.fees.proxy.qty);              ws.getCell("E38").numFmt = "0";
+  ws.getCell("D39").value = toNum(data.fees.basic.unit);             ws.getCell("D39").numFmt = moneyFmt;
+  ws.getCell("E39").value = toNum(data.fees.basic.qty);              ws.getCell("E39").numFmt = "0";
 
-  // ---- 技術料など（課税）：D=単価 / E=個数（Fは式に任せる）----
-  sheet.cell("D37").value(Number(data.fees.partsExchangeTech.unit || 0)).style("numberFormat", moneyFmt);
-  sheet.cell("E37").value(Number(data.fees.partsExchangeTech.qty || 0)).style("numberFormat", "0");
-  sheet.cell("D38").value(Number(data.fees.proxy.unit || 0)).style("numberFormat", moneyFmt);
-  sheet.cell("E38").value(Number(data.fees.proxy.qty || 0)).style("numberFormat", "0");
-  sheet.cell("D39").value(Number(data.fees.basic.unit || 0)).style("numberFormat", moneyFmt);
-  sheet.cell("E39").value(Number(data.fees.basic.qty || 0)).style("numberFormat", "0");
-
-  // ---- 調整値引き／預り金（該当行のF列＝金額列に直接）----
-  const usedRange = () => {
-    const rng = sheet.usedRange();
-    return {
-      values: rng.value() as unknown[][],
-      startRow: rng.startCell().rowNumber(),
-      startCol: rng.startCell().columnNumber(),
-    };
-  };
-  const norm = (s: string) => String(s).replace(/\s+/g, "");
-  function findLabelCell(
-    matchers: (string | RegExp)[],
-    opt?: { rowMin?: number; rowMax?: number; searchFromBottom?: boolean }
-  ): { row: number; col: number } | null {
-    const { values, startRow, startCol } = usedRange();
-    const rStart = opt?.searchFromBottom ? values.length - 1 : 0;
-    const rEnd = opt?.searchFromBottom ? -1 : values.length;
-    const rStep = opt?.searchFromBottom ? -1 : 1;
-    for (let i = rStart; i !== rEnd; i += rStep) {
-      const rowNumber = startRow + i;
-      if (opt?.rowMin && rowNumber < opt.rowMin) continue;
-      if (opt?.rowMax && rowNumber > opt.rowMax) continue;
-      const rowVals = values[i];
-      for (let j = 0; j < rowVals.length; j++) {
-        const v = rowVals[j];
-        if (typeof v !== "string") continue;
-        const s = norm(v);
-        const hit = matchers.some(m => typeof m === "string" ? s.includes(norm(m)) : (m as RegExp).test(s));
-        if (hit) return { row: rowNumber, col: startCol + j };
-      }
-    }
-    return null;
-  }
-  function writeAmountF(matchers: (string | RegExp)[], val: number) {
-    const pos = findLabelCell(matchers, { searchFromBottom: true });
+  // 6) 調整値引き/預り金 … 該当ラベル行の F 列へ
+  const writeAmountF = (labels: (string|RegExp)[], val: number) => {
+    const pos = findLabelCell(ws, labels, { searchFromBottom: true });
     if (!pos) return;
-    sheet.cell(`F${pos.row}`).value(val).style("numberFormat", moneyFmt);
+    const cell = ws.getCell(pos.row, 6);
+    cell.value = val;
+    cell.numFmt = moneyFmt;
+  };
+  writeAmountF(["調整値引き"], toNum(data.fees.discount));
+  writeAmountF(["預り金"],     toNum(data.fees.deposit));
+
+  // 7) 会社情報
+  if (data.settings.company.address) ws.getCell("B46").value = data.settings.company.address;
+  if (data.settings.company.name)    ws.getCell("B47").value = data.settings.company.name;
+
+  // 8) 既存のロゴ画像を削除 → 改めてセル範囲アンカーで追加
+  const getImages = (ws as unknown as { getImages?: () => Array<{ imageId: number }> }).getImages;
+  if (typeof getImages === "function") {
+    for (const im of getImages.call(ws)) {
+      (ws as unknown as { removeImage: (id: number) => void }).removeImage(im.imageId);
+    }
   }
-  writeAmountF(["調整値引き"], Number(data.fees.discount || 0));
-  writeAmountF(["預り金"], Number(data.fees.deposit || 0));
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    const logoBuf = await readFile(logoPath);
+    const imgId = book.addImage({ base64: "data:image/png;base64," + logoBuf.toString("base64"), extension: "png" });
+    // ★ テンプレと同じ位置に合わせてください（例: "B49:F53"）
+    ws.addImage(imgId, "B49:F53");
+  } catch (e) {
+    console.warn("logo insert skipped:", e);
+  }
 
-  // 会社情報（任意）
-  if (data.settings.company.address) sheet.cell("B46").value(data.settings.company.address);
-  if (data.settings.company.name) sheet.cell("B47").value(data.settings.company.name);
+  // 9) 開いたときに再計算
+  book.calcProperties.fullCalcOnLoad = true;
 
-
-
-  // 出力 & ダウンロードレスポンス
-  // ===== xlsx-populate でセル書き込み完了 =====
-  const out = await wb.outputAsync(); // ArrayBuffer | Uint8Array
-
-  // xlsx-populate の出力を ArrayBuffer に正規化（新規にコピー）
-  const toArrayBuffer = (x: ArrayBuffer | Uint8Array): ArrayBuffer => {
+  // 10) 出力
+  const out = await book.xlsx.writeBuffer(); // ArrayBuffer | Uint8Array
+  const toAB = (x: ArrayBuffer | Uint8Array): ArrayBuffer => {
     const src = x instanceof ArrayBuffer ? new Uint8Array(x) : x;
     const ab = new ArrayBuffer(src.byteLength);
     new Uint8Array(ab).set(src);
     return ab;
   };
-  const ab = toArrayBuffer(out);
 
-  // ===== ExcelJS でロゴを “セルにアンカー” して再挿入 =====
-  const book = new Workbook();
-  await book.xlsx.load(ab);
-  const ws =
-    book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
-    book.worksheets[0];
-
-  // ✅ 既存画像の全削除（Numbers対策）
-  const images = typeof (ws as unknown as { getImages?: () => Array<{ imageId: number }> }).getImages === "function"
-    ? (ws as unknown as { getImages: () => Array<{ imageId: number }> }).getImages()
-    : [];
-  for (const im of images) {
-    (ws as unknown as { removeImage: (id: number) => void }).removeImage(im.imageId);
-  }
-
-  try {
-    const logoPath = path.join(process.cwd(), "public", "logo.png");
-    const logoBuf = await readFile(logoPath);
-    const logoB64 = "data:image/png;base64," + logoBuf.toString("base64"); // ★base64化
-    const imgId = book.addImage({ base64: logoB64, extension: "png" });     // ★buffer→base64
-
-    // ★ ロゴ位置：テンプレと同じセル範囲にアンカー
-    //    例) B49:F53（0始まり指定なので B→col:1, 行49→row:48）
-    ws.addImage(imgId, "A44:A49");
-  } catch (e) {
-    console.warn("logo insert skipped:", e);
-  }
-
-  // 最終バイナリを返す
-  const finalAb = await book.xlsx.writeBuffer(); // ArrayBuffer（環境により Uint8Array のことも）
-  const body =
-    finalAb instanceof ArrayBuffer ? finalAb : toArrayBuffer(finalAb as Uint8Array);
-
-  return new Response(body, {
+  return new Response(out instanceof ArrayBuffer ? out : toAB(out), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="estimate_${data.meta.invoiceNo}.xlsx"`,
+      "Content-Disposition": `attachment; filename="estimate_${encodeURIComponent(data.meta.invoiceNo)}.xlsx"`,
       "Cache-Control": "no-store",
     },
   });
-
 }
