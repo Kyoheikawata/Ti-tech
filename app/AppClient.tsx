@@ -476,7 +476,7 @@ export default function AppClient() {
                         className="w-9 h-9 rounded object-cover ring-1 ring-slate-200"
                         onError={(e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.style.display = 'none'; }}
                     />
-                    <div className="font-semibold">車検整備 見積書ビルダー</div>
+                    <div className="font-semibold">Ti-Tech見積書・請求書ビルダー</div>
                     <div className="ml-auto text-xs text-slate-600 whitespace-normal break-words max-w-[55vw]">
                         {settings.company.address} ｜ {settings.company.phone}
                     </div>
