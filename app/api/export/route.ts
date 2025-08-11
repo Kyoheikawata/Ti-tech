@@ -200,7 +200,7 @@ for (let i = 0; i < used; i++) {
     const logoBuf = await readFile(logoPath);
     const imgId = book.addImage({ base64: "data:image/png;base64," + logoBuf.toString("base64"), extension: "png" });
     // ★ テンプレと同じ位置に
-    ws.addImage(imgId, "A42:A46");
+    ws.addImage(imgId, "A44:A49");
   } catch (e) {
     console.warn("logo insert skipped:", e);
   }
