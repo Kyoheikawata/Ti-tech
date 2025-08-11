@@ -64,6 +64,10 @@ const toIntSafe = (raw: string) => {
 };
 const asInput = (n: number) => (Number.isFinite(n) ? String(n) : "");
 
+function isComposingNative(ev: unknown): boolean {
+  const obj = ev as { isComposing?: boolean };
+  return obj?.isComposing === true;
+}
 export default function AppClient() {
     //自由部品入力
 const [customParts, setCustomParts] = useState<CustomPart[]>([
@@ -443,18 +447,17 @@ const taxableBase = itemsSubtotal + customSubtotal + extrasTotal;      // ②
   inputMode="numeric"
   placeholder="0"
   value={asInput(p.unit)}
-onChange={(e) => {
-  const isComposing = (e.nativeEvent as any)?.isComposing === true; 
-  if (isComposing) return;
-  const n = toIntSafe((e.target as HTMLInputElement).value);
-    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
-
-}}
+  onChange={(e) => {
+    if (isComposingNative(e.nativeEvent)) return; // 合成中は無視
+    const n = toIntSafe((e.target as HTMLInputElement).value);
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x)); // ★unit を更新
+  }}
   onCompositionEnd={(e) => {
     const n = toIntSafe((e.target as HTMLInputElement).value);
-    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x));
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x)); // ★unit を確定
   }}
 />
+
 
         {/* 個数：同様に安全化、0以上 */}
 <input
@@ -462,17 +465,14 @@ onChange={(e) => {
   inputMode="numeric"
   placeholder="1"
   value={asInput(p.qty)}
-onChange={(e) => {
-  const isComposing = (e.nativeEvent as any)?.isComposing === true;
-  if (isComposing) return;
-  const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
-    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
-
-}}
-
+  onChange={(e) => {
+    if (isComposingNative(e.nativeEvent)) return;
+    const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x)); // ★qty を更新
+  }}
   onCompositionEnd={(e) => {
     const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
-    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x)); // ★qty を確定
   }}
 />
 
