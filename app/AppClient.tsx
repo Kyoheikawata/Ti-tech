@@ -1,23 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 
-// ===== xlsx-populate を型に依存せず使うための最小型 =====
-type CellLite = {
-    value(): unknown;
-    value(v: unknown): CellLite;
-    style(key: string, val: unknown): CellLite;
-    formula?: () => string | null;
-};
-type UsedRangeLite = {
-    value(): unknown[][];
-    startCell(): { rowNumber(): number; columnNumber(): number };
-};
-type SheetLite = {
-    cell(ref: string): CellLite;
-    cell(row: number, col: number): CellLite;
-    row(r: number): { hidden(v?: boolean): unknown };
-    usedRange(): UsedRangeLite;
-};
 
 
 
@@ -460,13 +443,13 @@ const taxableBase = itemsSubtotal + customSubtotal + extrasTotal;      // ②
   inputMode="numeric"
   placeholder="0"
   value={asInput(p.unit)}
-  onChange={(e) => {
-    // 合成中は無視
-    // @ts-ignore
-    if (e.nativeEvent?.isComposing) return;
-    const n = toIntSafe(e.target.value);
-    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x));
-  }}
+onChange={(e) => {
+  const isComposing = (e.nativeEvent as any)?.isComposing === true; 
+  if (isComposing) return;
+  const n = toIntSafe((e.target as HTMLInputElement).value);
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
+
+}}
   onCompositionEnd={(e) => {
     const n = toIntSafe((e.target as HTMLInputElement).value);
     setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x));
@@ -479,13 +462,14 @@ const taxableBase = itemsSubtotal + customSubtotal + extrasTotal;      // ②
   inputMode="numeric"
   placeholder="1"
   value={asInput(p.qty)}
-  onChange={(e) => {
-    // 合成中は無視
-    // @ts-ignore
-    if (e.nativeEvent?.isComposing) return;
-    const n = Math.max(0, toIntSafe(e.target.value));
+onChange={(e) => {
+  const isComposing = (e.nativeEvent as any)?.isComposing === true;
+  if (isComposing) return;
+  const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
     setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
-  }}
+
+}}
+
   onCompositionEnd={(e) => {
     const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
     setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
