@@ -99,6 +99,7 @@ const [meta, setMeta] = useState({
             address: "大阪府大阪狭山市大野台6-12-8  589-0023",
             phone: "06-1234-5678",
             bank: "三井住友銀行 ○○支店 普通 1234567 名前",
+            logoUrl: "/logo.png",
         },
         tax: { rate: 0.10 as number },
     });
@@ -634,6 +635,7 @@ const taxableBase = itemsSubtotal + customSubtotal + extrasTotal;      // ②
                                 <input className="border rounded-lg px-3 py-2" placeholder="住所" value={settings.company.address} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, address: (e.target as HTMLInputElement).value } })} />
                                 <input className="border rounded-lg px-3 py-2" placeholder="電話" value={settings.company.phone} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, phone: (e.target as HTMLInputElement).value } })} />
                                 <input className="border rounded-lg px-3 py-2" placeholder="振込（銀行名 支店 種別 口座名義 など）" value={settings.company.bank} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, bank: (e.target as HTMLInputElement).value } })} />
+                                <input className="border rounded-lg px-3 py-2" placeholder="ロゴURL (/logo.png など)" value={settings.company.logoUrl} onChange={(e) => setSettings({ ...settings, company: { ...settings.company, logoUrl: (e.target as HTMLInputElement).value } })} />
                             </div>
                             <div className="grid gap-2">
                                 <div className="font-medium text-slate-700">見積情報</div>
