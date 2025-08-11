@@ -18,11 +18,7 @@ type SheetLite = {
     row(r: number): { hidden(v?: boolean): unknown };
     usedRange(): UsedRangeLite;
 };
-type WorkbookLite = {
-    sheets(): SheetLite[];
-    sheet(index: number | string): SheetLite;
-    outputAsync(): Promise<ArrayBuffer>;
-};
+
 
 
 // ---- 型定義（アプリ用） ----
@@ -45,7 +41,7 @@ type LegalDraft = Record<LegalKey, QtyUnitDraft>;
 type FeeKey = "partsExchangeTech" | "proxy" | "basic";
 type Fees = Record<FeeKey, QtyUnit> & { discount: number; deposit: number };
 type FeesDraft = Record<FeeKey, QtyUnitDraft> & { discount: string; deposit: string };
-
+type CustomPart = { maker: string; name: string; partNo: string; unit: number; qty: number };
 // ---- サンプル品目（税込） ----
 const SERVICES: readonly ServiceDef[] = [
     { id: "susp_fork_oh_std", cat: "サスペンション系統", name: "フォークOH（正立・カートリッジ無）", price: 24800, bringIn: 49600, notes: "" },
@@ -77,8 +73,19 @@ const toNum = (v: string | number) => {
     const s = v.replace(/,/g, "").trim();
     return s === "" ? 0 : Number(s);
 };
+const toIntSafe = (raw: string) => {
+  if (typeof raw !== "string") return 0;
+  const half = raw.replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0));
+  const cleaned = half.replace(/[^\d]/g, "");
+  return cleaned ? Number(cleaned) : 0;
+};
+const asInput = (n: number) => (Number.isFinite(n) ? String(n) : "");
 
 export default function AppClient() {
+    //自由部品入力
+const [customParts, setCustomParts] = useState<CustomPart[]>([
+  { maker: "", name: "", partNo: "", unit: 0, qty: 1 },
+]);
     // 検索・選択
     const [q, setQ] = useState("");
     const [cat, setCat] = useState("ALL");
@@ -93,15 +100,18 @@ export default function AppClient() {
         model: "", modelCode: "", vin: "", engineModel: "",
         mileage: "", firstReg: "", nextInspection: "",
     });
-    const [meta, setMeta] = useState({ date: todayISO(), invoiceNo: "INV-" + todayISO().replaceAll("-", "") + "-001" });
-
+const [meta, setMeta] = useState({
+  date: todayISO(),
+  invoiceNo: "INV-" + todayISO().replaceAll("-", "") + "-001",
+  docTitle: "車検見積書", // ★追加：初期タイトル
+});
     // 事業者情報
     const [settings, setSettings] = useState({
         company: {
             name: "Ti-tech",
             address: "大阪府大阪狭山市大野台6−12−8  589-0023",
             phone: "06-1234-5678",
-            bank: "三井住友銀行 ○○支店 普通 1234567 カワタキョウヘイ",
+            bank: "三井住友銀行 ○○支店 普通 1234567 名前",
             logoUrl: "/logo.png",
         },
         tax: { rate: 0.10 as number },
@@ -161,14 +171,21 @@ export default function AppClient() {
     const itemsSubtotal = useMemo(() => items.reduce((a, b) => a + b.price * b.qty, 0), [items]);
 
     // 計算
-    const legalTotal = legal.jibaiseki24m.unit * legal.jibaiseki24m.qty
-        + legal.weightTax.unit * legal.weightTax.qty
-        + legal.stamp.unit * legal.stamp.qty;        // ① 非課税
+const jibaiLine = legal.jibaiseki24m.unit > 0 ? legal.jibaiseki24m.unit : 0;
+const legalTotal = jibaiLine
+  + legal.weightTax.unit * legal.weightTax.qty
+  + legal.stamp.unit * legal.stamp.qty;        // ① 非課税
     const extrasTotal = fees.partsExchangeTech.unit * fees.partsExchangeTech.qty
         + fees.proxy.unit * fees.proxy.qty
         + fees.basic.unit * fees.basic.qty;     // 課税
-    const nonTaxable = legalTotal;                                       // ①
-    const taxableBase = itemsSubtotal + extrasTotal;                     // ②
+    const nonTaxable = legalTotal;                                    // ①
+    
+    const customSubtotal = useMemo(
+  () => customParts.reduce((a, p) => a + (p.unit || 0) * (p.qty || 0), 0),
+  [customParts]
+);
+// 課税対象合計を変更
+const taxableBase = itemsSubtotal + customSubtotal + extrasTotal;      // ②
     const taxableAfterDiscount = Math.max(0, taxableBase - Math.max(0, fees.discount || 0));
     const grandTotal = nonTaxable + taxableAfterDiscount;                // ①+②（値引き後）
     const finalDue = Math.max(0, grandTotal - Math.max(0, fees.deposit || 0));
@@ -203,12 +220,12 @@ export default function AppClient() {
     // ==================== Excel 出力 ====================
     async function exportExcel() {
         try {
-            const payload = { client, vehicle, items, legal, fees, settings, meta };
-            const res = await fetch("/api/export", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
+    const payload = { client, vehicle, items, legal, fees, settings, meta, customParts }; // ★ここを追加
+    const res = await fetch("/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
                 throw new Error(`エクスポートに失敗しました: ${res.status} ${txt}`);
@@ -329,11 +346,11 @@ export default function AppClient() {
                                                 onBlur={() => setLegal((p) => ({ ...p, [key]: { unit: p[key].unit, qty: toNum(legalDraft[key].qty) } }))}
                                             />
 
-                                            <div className="col-span-12 sm:col-span-2 text-right">
-                                                {key === "jibaiseki24m" && yen(legal.jibaiseki24m.unit * legal.jibaiseki24m.qty)}
-                                                {key === "weightTax" && yen(legal.weightTax.unit * legal.weightTax.qty)}
-                                                {key === "stamp" && yen(legal.stamp.unit * legal.stamp.qty)}
-                                            </div>
+<div className="col-span-12 sm:col-span-2 text-right">
+  {key === "jibaiseki24m" && yen(legal.jibaiseki24m.unit)} {/* ← ×qtyしない */}
+  {key === "weightTax"   && yen(legal.weightTax.unit * legal.weightTax.qty)}
+  {key === "stamp"       && yen(legal.stamp.unit * legal.stamp.qty)}
+</div>
                                         </div>
                                     );
                                 })}
@@ -401,7 +418,103 @@ export default function AppClient() {
                             ))}
                         </div>
                     </div>
+{/* === 手入力部品 === */}
+<div className="bg-white rounded-2xl shadow-sm border p-3 mt-4">
+  <div className="text-sm font-semibold mb-2">手入力部品</div>
+
+  {/* 列見出しでガイドを明確化 */}
+  <div className="grid grid-cols-12 gap-2 text-[11px] text-slate-500 mb-1 px-1">
+    <div className="col-span-12 sm:col-span-2">メーカー</div>
+    <div className="col-span-12 sm:col-span-3">品目</div>
+    <div className="col-span-12 sm:col-span-3">部品番号</div>
+    <div className="col-span-6 sm:col-span-2 text-right">金額(円)</div>
+    <div className="col-span-6 sm:col-span-1 text-right">個数</div>
+    <div className="col-span-12 sm:col-span-1"></div>
+  </div>
+
+  <div className="grid gap-3">
+    {customParts.map((p, idx) => (
+      <div key={idx} className="grid grid-cols-12 gap-2 items-center border rounded-xl p-3">
+        <input
+          className="col-span-12 sm:col-span-2 border rounded px-2 py-1 text-sm"
+          placeholder="例: NGK"
+          value={p.maker}
+          onChange={e => setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, maker:e.target.value}:x))}
+        />
+        <input
+          className="col-span-12 sm:col-span-3 border rounded px-2 py-1 text-sm"
+          placeholder="例: スパークプラグ"
+          value={p.name}
+          onChange={e => setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, name:e.target.value}:x))}
+        />
+        <input
+          className="col-span-12 sm:col-span-3 border rounded px-2 py-1 text-sm"
+          placeholder="例: DPR8EA-9"
+          value={p.partNo}
+          onChange={e => setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, partNo:e.target.value}:x))}
+        />
+
+        {/* 金額(円)：NaN回避 & 全角/記号対策 */}
+<input
+  className="col-span-6 sm:col-span-2 border rounded px-2 py-1 text-right text-sm"
+  inputMode="numeric"
+  placeholder="0"
+  value={asInput(p.unit)}
+  onChange={(e) => {
+    // 合成中は無視
+    // @ts-ignore
+    if (e.nativeEvent?.isComposing) return;
+    const n = toIntSafe(e.target.value);
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x));
+  }}
+  onCompositionEnd={(e) => {
+    const n = toIntSafe((e.target as HTMLInputElement).value);
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, unit:n}:x));
+  }}
+/>
+
+        {/* 個数：同様に安全化、0以上 */}
+<input
+  className="col-span-6 sm:col-span-1 border rounded px-2 py-1 text-right text-sm"
+  inputMode="numeric"
+  placeholder="1"
+  value={asInput(p.qty)}
+  onChange={(e) => {
+    // 合成中は無視
+    // @ts-ignore
+    if (e.nativeEvent?.isComposing) return;
+    const n = Math.max(0, toIntSafe(e.target.value));
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
+  }}
+  onCompositionEnd={(e) => {
+    const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
+    setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty:n}:x));
+  }}
+/>
+
+        <div className="col-span-12 sm:col-span-1 flex justify-end">
+          <button
+            type="button"
+            className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
+            onClick={() => setCustomParts(cs => cs.filter((_,i)=>i!==idx))}
+          >削除</button>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <div className="mt-3">
+    <button
+      type="button"
+      className="px-3 py-1.5 rounded-lg border text-sm bg-white hover:bg-slate-50"
+      onClick={() => setCustomParts(cs => [...cs, { maker:"", name:"", partNo:"", unit:0, qty:1 }])}
+    >＋ 行を追加</button>
+  </div>
+</div>
+
                 </section>
+
+
 
                 {/* 右：プレビュー & 出力 */}
                 <section className="md:col-span-4">
@@ -424,6 +537,24 @@ export default function AppClient() {
                                     <button type="button" onClick={() => removeItem(idx)} className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100">削除</button>
                                 </div>
                             ))}
+                            {customParts.map((it, idx) => (
+  <div key={`cp_${idx}`} className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+    <div className="flex-1 min-w-0">
+      <div className="font-medium text-sm break-words">
+        {it.name} {it.maker && `（${it.maker}）`} {it.partNo && `P/N:${it.partNo}`}
+      </div>
+      <div className="text-xs text-slate-500">部品 / 単価 {yen(it.unit)}</div>
+    </div>
+    <input type="number" min={0} value={it.qty}
+           onChange={(e) => setCustomParts(cs => cs.map((x,i)=> i===idx?{...x, qty: Math.max(0, Number(e.target.value||0))}:x))}
+           className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
+    <div className="w-28 text-right text-sm font-semibold">{yen((it.unit||0)*(it.qty||0))}</div>
+    <button type="button"
+            onClick={() => setCustomParts(cs => cs.filter((_,i)=> i!==idx))}
+            className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100">削除</button>
+  </div>
+))}
+
                         </div>
 
                         {/* 技術料など（課税） 単価/個数 */}
@@ -526,6 +657,18 @@ export default function AppClient() {
                                 <div className="font-medium text-slate-700">見積情報</div>
                                 <input className="border rounded-lg px-3 py-2" placeholder="日付" type="date" value={meta.date} onChange={(e) => setMeta({ ...meta, date: (e.target as HTMLInputElement).value })} />
                                 <input className="border rounded-lg px-3 py-2" placeholder="見積番号" value={meta.invoiceNo} onChange={(e) => setMeta({ ...meta, invoiceNo: (e.target as HTMLInputElement).value })} />
+                                <select
+  className="border rounded-lg px-3 py-2"
+  value={meta.docTitle}
+  onChange={(e) => setMeta({ ...meta, docTitle: (e.target as HTMLSelectElement).value })}
+>
+  <option>車検見積書</option>
+  <option>車検請求書</option>
+  <option>整備見積書</option>
+  <option>整備請求書</option>
+  <option>レーシングサービス見積書</option>
+  <option>レーシングサービス請求書</option>
+</select>
                                 <div className="text-xs text-slate-500">※ 税は内税想定。Excelは添付テンプレに準拠。</div>
                             </div>
                         </div>
