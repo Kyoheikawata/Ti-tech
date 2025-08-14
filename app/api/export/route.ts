@@ -9,9 +9,21 @@ export const runtime = "nodejs";
 type LegalKey = "jibaiseki24m" | "weightTax" | "stamp";
 type QtyUnit = { unit: number; qty: number };
 type Legal = Record<LegalKey, QtyUnit>;
-type FeeKey = "partsExchangeTech" | "proxy" | "basic";
-type Fees = Record<FeeKey, QtyUnit> & { discount: number; deposit: number };
+type Fees = { discount: number; deposit: number };
 
+// 備考を持てるように
+type Meta = { date: string; invoiceNo: string; docTitle?: string; remarks?: string };
+
+type ExportPayload = {
+  client: Client;
+  vehicle: Vehicle;
+  items: Item[];
+  legal: Legal;
+  fees: Fees;           // ← 3項目なし
+  settings: Settings;
+  meta: Meta;           // ← remarks を受け取る
+  customParts?: CustomPart[];
+};
 type Item = { id: string; name: string; price: number; qty: number; cat: string; notes?: string };
 type ItemEx = Item & { maker?: string; partNo?: string };
 type Client = { name: string; phone: string; email: string; address: string };
@@ -21,11 +33,7 @@ type Vehicle = {
 };
 type Settings = { company: { name: string; address: string; phone: string; bank: string; logoUrl: string }; tax: { rate: number } };
 type CustomPart = { maker?: string; name: string; partNo?: string; unit: number; qty: number };
-type Meta = { date: string; invoiceNo: string; docTitle?: string };
-type ExportPayload = {
-  client: Client; vehicle: Vehicle; items: Item[]; legal: Legal; fees: Fees; settings: Settings; meta: Meta;
-  customParts?: CustomPart[];
-};
+
 // 共通
 const moneyFmt = '"¥"#,##0;-"¥"#,##0';
 const toNum = (v: unknown) => (typeof v === "number" ? v : Number(v || 0));
@@ -168,13 +176,10 @@ for (let i = 0; i < used; i++) {
   }
   for (let r = START + used; r <= END; r++) ws.getRow(r).hidden = true;
 
-  // 5) 技術料（D/Eのみ）
-  ws.getCell("D37").value = toNum(data.fees.partsExchangeTech.unit); ws.getCell("D37").numFmt = moneyFmt;
-  ws.getCell("E37").value = toNum(data.fees.partsExchangeTech.qty);  ws.getCell("E37").numFmt = "0";
-  ws.getCell("D38").value = toNum(data.fees.proxy.unit);             ws.getCell("D38").numFmt = moneyFmt;
-  ws.getCell("E38").value = toNum(data.fees.proxy.qty);              ws.getCell("E38").numFmt = "0";
-  ws.getCell("D39").value = toNum(data.fees.basic.unit);             ws.getCell("D39").numFmt = moneyFmt;
-  ws.getCell("E39").value = toNum(data.fees.basic.qty);              ws.getCell("E39").numFmt = "0";
+// 備考を A37 セルに直接書き込む
+ws.getCell("B37").value = data.meta?.remarks ?? "";
+ws.getCell("B37").alignment = { wrapText: true, vertical: "top" };
+
 
   // 6) 調整値引き/預り金 … 該当ラベル行の F 列へ
   const writeAmountF = (labels: (string|RegExp)[], val: number) => {

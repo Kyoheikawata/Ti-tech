@@ -21,387 +21,12 @@ type LegalKey = "jibaiseki24m" | "weightTax" | "stamp";
 type Legal = Record<LegalKey, QtyUnit>;
 type LegalDraft = Record<LegalKey, QtyUnitDraft>;
 
-type FeeKey = "partsExchangeTech" | "proxy" | "basic";
-type Fees = Record<FeeKey, QtyUnit> & { discount: number; deposit: number };
-type FeesDraft = Record<FeeKey, QtyUnitDraft> & { discount: string; deposit: string };
+type Fees = { discount: number; deposit: number };
+type FeesDraft = { discount: string; deposit: string };
 type CustomPart = { maker: string; name: string; partNo: string; unit: number; qty: number };
 // ---- サンプル品目（税込） ----
 const SERVICES: readonly ServiceDef[] = [
     // エンジン系統
-    { id: "engine_remove_4st", cat: "エンジン系統", name: "エンジン脱着（4ストローク）", price: 52000, bringIn: 104000, notes: "カウル脱着別途" },
-    { id: "engine_remove_2st", cat: "エンジン系統", name: "エンジン脱着（2ストローク）", price: 31200, bringIn: 62400, notes: "カウル脱着別途" },
-    { id: "engine_remove_single", cat: "エンジン系統", name: "エンジン脱着（レーサー等シングル）", price: 8000, bringIn: 16000, notes: "カウル脱着別途" },
-    { id: "engine_full_oh_4st", cat: "エンジン系統", name: "エンジンフルオーバーホール（4ストローク）", price: 200000, bringIn: 400000, notes: "エンジン脱着等別途" },
-    { id: "engine_full_oh_single", cat: "エンジン系統", name: "エンジンフルオーバーホール（シングル）", price: 120000, bringIn: 240000, notes: "エンジン脱着等別途" },
-    { id: "engine_full_oh_2st", cat: "エンジン系統", name: "エンジンフルオーバーホール（2ストローク）", price: 32500, bringIn: 65000, notes: "エンジン脱着等別途" },
-    { id: "engine_full_oh_2st_single", cat: "エンジン系統", name: "エンジンフルオーバーホール（2スト・レーサー等シングル）", price: 24000, bringIn: 48000, notes: "エンジン脱着等別途" },
-    { id: "engine_top_oh_4st", cat: "エンジン系統", name: "エンジン腰上オーバーホール（4ストローク）", price: 100000, bringIn: 200000, notes: "エンジン脱着等別途" },
-    { id: "engine_top_oh_single", cat: "エンジン系統", name: "エンジン腰上オーバーホール（シングル）", price: 60000, bringIn: 120000, notes: "エンジン脱着等別途" },
-    { id: "engine_top_oh_2st", cat: "エンジン系統", name: "エンジン腰上オーバーホール（2ストローク）", price: 16900, bringIn: 33800, notes: "エンジン脱着等別途" },
-    { id: "engine_top_oh_2st_single", cat: "エンジン系統", name: "エンジン腰上オーバーホール（2スト・レーサー等シングル）", price: 12000, bringIn: 24000, notes: "エンジン脱着等別途" },
-    { id: "engine_head_oh_4st", cat: "エンジン系統", name: "ヘッドオーバーホール（4ストローク）", price: 60000, bringIn: 120000, notes: "エンジン脱着等別途" },
-    { id: "engine_head_oh_single", cat: "エンジン系統", name: "ヘッドオーバーホール（シングル）", price: 40000, bringIn: 80000, notes: "エンジン脱着等別途" },
-
-    // サスペンション系統
-    { id: "susp_fork_oh_std", cat: "サスペンション系統", name: "フォークOH（正立カートリッジ無）", price: 24800, bringIn: 49600, notes: "フォーク単体持込16500円、カウル脱着別途" },
-    { id: "susp_fork_oh_cart", cat: "サスペンション系統", name: "フォークOH（倒立・正立カートリッジ式）", price: 29700, bringIn: 59400, notes: "フォーク単体持込21400円、カウル脱着別途" },
-    { id: "susp_fork_oil", cat: "サスペンション系統", name: "フォークオイル交換", price: 19800, bringIn: 39600, notes: "カウル脱着別途" },
-    { id: "susp_fork_spring", cat: "サスペンション系統", name: "フォークスプリング交換", price: 19800, bringIn: 39600, notes: "カウル脱着別途" },
-    { id: "susp_fork_boots", cat: "サスペンション系統", name: "フォークブーツ交換", price: 13200, bringIn: 26400, notes: "カウル脱着別途" },
-    { id: "susp_rear_twin", cat: "サスペンション系統", name: "リヤショック交換（ツイン）", price: 7400, bringIn: 14800, notes: "カウル脱着別途" },
-    { id: "susp_rear_mono", cat: "サスペンション系統", name: "リヤショック交換（モノ）", price: 14900, bringIn: 29800, notes: "カウル、タンク脱着別途" },
-    { id: "susp_lowdown", cat: "サスペンション系統", name: "ローダウンブラケット取り付け", price: 5000, bringIn: 10000, notes: "カウル脱着・加工別途" },
-
-    // タイヤ・ホイール系統
-    { id: "tire_harley_f", cat: "タイヤ・ホイール系統", name: "ハーレーフロントタイヤ交換", price: 8800, bringIn: 17600 },
-    { id: "tire_harley_r", cat: "タイヤ・ホイール系統", name: "ハーレーリアタイヤ交換", price: 11000, bringIn: 22000 },
-    { id: "tire_harley_r_touring", cat: "タイヤ・ホイール系統", name: "ハーレーリアタイヤ交換ツーリング", price: 11000, bringIn: 22000 },
-    { id: "tire_split_f", cat: "タイヤ・ホイール系統", name: "タイヤ交換 合わせホイール（フロント）", price: 5700, bringIn: 11400, notes: "バランス不可" },
-    { id: "tire_split_r", cat: "タイヤ・ホイール系統", name: "タイヤ交換 合わせホイール（リア）", price: 6800, bringIn: 13600, notes: "バランス不可、同時Rスプロケ交換無料" },
-    { id: "tire_split_bring", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ホイール持込合わせホイール", price: 4000, bringIn: 8000, notes: "バランス不可" },
-    { id: "tire_scooter_f_125", cat: "タイヤ・ホイール系統", name: "タイヤ交換 スクーターフロント（国産～125cc）", price: 4000 },
-    { id: "tire_scooter_r_125", cat: "タイヤ・ホイール系統", name: "タイヤ交換 スクーターリア（国産～125cc）", price: 5000 },
-    { id: "tire_scooter_f_125_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 スクーターフロント（外車～125cc）", price: 6000 },
-    { id: "tire_scooter_r_125_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 スクーターリア（外車～125cc）", price: 7500 },
-    { id: "tire_big_scooter_f", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ビッグスクーターフロント（国産126cc～）", price: 4400 },
-    { id: "tire_big_scooter_r", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ビッグスクーターリア（国産126cc～）", price: 5500 },
-    { id: "tire_big_scooter_f_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ビッグスクーターフロント（外車126cc～）", price: 6600 },
-    { id: "tire_big_scooter_r_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ビッグスクーターリア（外車126cc～）", price: 8200 },
-    { id: "tire_f", cat: "タイヤ・ホイール系統", name: "タイヤ交換 フロント（国産）", price: 4400, notes: "バランスサービス" },
-    { id: "tire_r", cat: "タイヤ・ホイール系統", name: "タイヤ交換 リア（国産）", price: 5500, notes: "バランスサービス" },
-    { id: "tire_f_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 フロント（外車/社外ホイール）", price: 6600, notes: "バランスサービス" },
-    { id: "tire_r_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 リア（外車/社外ホイール）", price: 8200, notes: "バランスサービス" },
-    { id: "tire_wheel_bring", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ホイール持込（国産）", price: 2700, notes: "バランスサービス" },
-    { id: "tire_wheel_bring_import", cat: "タイヤ・ホイール系統", name: "タイヤ交換 ホイール持込（外車）", price: 4000, notes: "バランスサービス" },
-    { id: "tire_valve_harley_f", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（ハーレー・フロント）", price: 8800, bringIn: 17600, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_harley_r", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（ハーレー・リア）", price: 11000, bringIn: 22000, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_split_f", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（合わせホイール・フロント）", price: 5700, bringIn: 11400, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_split_r", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（合わせホイール・リア）", price: 6800, bringIn: 13600, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_split_bring", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（ホイール持込合わせ）", price: 4000, bringIn: 8000, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_scooter_f_125", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（国産スクーター～125cc・フロント）", price: 4000, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_scooter_r_125", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（国産スクーター～125cc・リア）", price: 5000, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_scooter_f_125_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（外車スクーター～125cc・フロント）", price: 6000, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_scooter_r_125_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（外車スクーター～125cc・リア）", price: 7500, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_big_scooter_f", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（国産ビッグスクーター・フロント）", price: 4400, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_big_scooter_r", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（国産ビッグスクーター・リア）", price: 5500, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_big_scooter_f_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（外車ビッグスクーター・フロント）", price: 6600, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_big_scooter_r_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（外車ビッグスクーター・リア）", price: 8200, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_f", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（国産・フロント）", price: 4400, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_r", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（国産・リア）", price: 5500, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_f_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（外車/社外ホイール・フロント）", price: 6600, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_r_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（外車/社外ホイール・リア）", price: 8200, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_wheel_bring", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（ホイール持込・国産）", price: 2700, notes: "部品代無料（当社指定品）" },
-{ id: "tire_valve_wheel_bring_import", cat: "タイヤ・ホイール系統", name: "エアバルブ単品交換（ホイール持込・外車）", price: 4000, notes: "部品代無料（当社指定品）" },
-    { id: "tire_disposal", cat: "タイヤ・ホイール系統", name: "タイヤ処分（1本）", price: 400, bringIn: 400, notes: "廃タイヤ持込も同額" },
-    { id: "tire_nitrogen", cat: "タイヤ・ホイール系統", name: "窒素ガス充填（1本）", price: 700 },
-    { id: "tire_nitrogen_refill", cat: "タイヤ・ホイール系統", name: "窒素ガス補充（1本）", price: 350 },
-    { id: "tire_tube_harley_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（ハーレー・フロント）", price: 8800, bringIn: 17600 },
-{ id: "tire_tube_harley_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（ハーレー・リア）", price: 11000, bringIn: 22000 },
-{ id: "tire_tube_split_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（合わせホイール・フロント）", price: 5700, bringIn: 11400 },
-{ id: "tire_tube_split_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（合わせホイール・リア）", price: 6800, bringIn: 13600 },
-{ id: "tire_tube_split_bring", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（ホイール持込合わせ）", price: 4000, bringIn: 8000 },
-{ id: "tire_tube_scooter_f_125", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（国産スクーター～125cc・フロント）", price: 4000 },
-{ id: "tire_tube_scooter_r_125", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（国産スクーター～125cc・リア）", price: 5000 },
-{ id: "tire_tube_scooter_f_125_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（外車スクーター～125cc・フロント）", price: 6000 },
-{ id: "tire_tube_scooter_r_125_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（外車スクーター～125cc・リア）", price: 7500 },
-{ id: "tire_tube_big_scooter_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（国産ビッグスクーター・フロント）", price: 4400 },
-{ id: "tire_tube_big_scooter_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（国産ビッグスクーター・リア）", price: 5500 },
-{ id: "tire_tube_big_scooter_f_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（外車ビッグスクーター・フロント）", price: 6600 },
-{ id: "tire_tube_big_scooter_r_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（外車ビッグスクーター・リア）", price: 8200 },
-{ id: "tire_tube_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（国産・フロント）", price: 4400 },
-{ id: "tire_tube_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（国産・リア）", price: 5500 },
-{ id: "tire_tube_f_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（外車/社外ホイール・フロント）", price: 6600 },
-{ id: "tire_tube_r_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（外車/社外ホイール・リア）", price: 8200 },
-{ id: "tire_tube_wheel_bring", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（ホイール持込・国産）", price: 2700 },
-{ id: "tire_tube_wheel_bring_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（ホイール持込・外車）", price: 4000 },
-    { id: "tire_tube_with_harley_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・ハーレー・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_harley_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・ハーレー・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_split_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・合わせホイール・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_split_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・合わせホイール・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_split_bring", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・ホイール持込合わせ）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_scooter_f_125", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・国産スクーター～125cc・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_scooter_r_125", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・国産スクーター～125cc・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_scooter_f_125_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・外車スクーター～125cc・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_scooter_r_125_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・外車スクーター～125cc・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_big_scooter_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・国産ビッグスクーター・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_big_scooter_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・国産ビッグスクーター・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_big_scooter_f_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・外車ビッグスクーター・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_big_scooter_r_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・外車ビッグスクーター・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_f", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・国産・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_r", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・国産・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_f_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・外車/社外ホイール・フロント）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_r_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・外車/社外ホイール・リア）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_wheel_bring", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・ホイール持込・国産）", price: 0, notes: "タイヤ交換同時0円" },
-{ id: "tire_tube_with_wheel_bring_import", cat: "タイヤ・ホイール系統", name: "タイヤチューブ（タイヤ交換時・ホイール持込・外車）", price: 0, notes: "タイヤ交換同時0円" },
-    { id: "tire_puncture_check", cat: "タイヤ・ホイール系統", name: "パンク点検", price: 0 },
-    { id: "tire_puncture_repair", cat: "タイヤ・ホイール系統", name: "パンク修理（1ヶ所）", price: 2500 },
-    { id: "wheel_bearing_f", cat: "タイヤ・ホイール系統", name: "ホイールベアリング交換フロント", price: 8400, bringIn: 16800, notes: "タイヤ同時交換時+3300円/個" },
-    { id: "wheel_bearing_r", cat: "タイヤ・ホイール系統", name: "ホイールベアリング交換リア", price: 9600, bringIn: 19200, notes: "Rスプロケットベアリング別途3300円、タイヤ同時交換時+3300円/個" },
-    { id: "wheel_bearing_bring", cat: "タイヤ・ホイール系統", name: "ホイールベアリング交換（ホイール持込）", price: 3300, bringIn: 6600, notes: "ベアリング1個につき3300円" },
-    { id: "wheel_balance", cat: "タイヤ・ホイール系統", name: "ホイール持込バランス", price: 800, notes: "タイヤ交換時バランスサービス" },
-
-    // ハンドル系統
-    { id: "handle_grip", cat: "ハンドル系統", name: "グリップ交換（1台）", price: 3300, bringIn: 6600, notes: "カウル脱着別途、アクセルホルダー加工+1500円、バーエンド脱着+1200円" },
-    { id: "handle_grip_end", cat: "ハンドル系統", name: "グリップエンド交換（1台）", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "handle_grip_heater_naked", cat: "ハンドル系統", name: "グリップヒーター取り付け（ネイキッド・アメリカン）", price: 14000, bringIn: 28000, notes: "巻きタイプ-2500円、アクセルホルダー加工+1500円" },
-    { id: "handle_grip_heater_125", cat: "ハンドル系統", name: "グリップヒーター取り付け（～125ccスクーター）", price: 14900, bringIn: 29800, notes: "巻きタイプ-2500円、アクセルホルダー加工+1500円" },
-    { id: "handle_grip_heater_big", cat: "ハンドル系統", name: "グリップヒーター取り付け（ビッグスクーター・カウル付き）", price: 16500, bringIn: 33000, notes: "巻きタイプ-2500円、アクセルホルダー加工+1500円" },
-    { id: "handle_grip_heater_relay", cat: "ハンドル系統", name: "グリップヒーター追加リレー", price: 5000, bringIn: 10000, notes: "カウル脱着別途" },
-    { id: "handle_separate", cat: "ハンドル系統", name: "セパレートハンドル取り付け", price: 9900, bringIn: 19800, notes: "カウル脱着別途、トップブリッジ脱着6100円、穴あけ加工別途" },
-    { id: "handle_bar_end_cap", cat: "ハンドル系統", name: "バーエンドキャップ取り付け（1台）", price: 2500, bringIn: 5000, notes: "グリップエンドと同作業" },
-    { id: "handle_bar", cat: "ハンドル系統", name: "バーハンドル（単品）", price: 7400, bringIn: 14800, notes: "車種専用（穴あけ）、穴あけ加工+1500円" },
-    { id: "handle_bar_bracket", cat: "ハンドル系統", name: "バーハンドル＋ブラケット取り付け", price: 10700, bringIn: 21400, notes: "バーハンドル交換7400円+チューニングパーツ取付3300円" },
-    { id: "handle_bracket", cat: "ハンドル系統", name: "バーハンドルブラケット取り付け（ポスト）", price: 3300, bringIn: 6600, notes: "カウル脱着別途" },
-    { id: "handle_highthrottle", cat: "ハンドル系統", name: "ハイスロキット取り付け", price: 12400, bringIn: 24800, notes: "カウル、タンク脱着別途" },
-    { id: "handle_up_spacer", cat: "ハンドル系統", name: "ハンドルアップスペーサー取り付け", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "handle_guard", cat: "ハンドル系統", name: "ハンドルガード取り付け（ナックルガード）左右", price: 5000, bringIn: 10000, notes: "カウル脱着・加工別途" },
-    { id: "handle_brace", cat: "ハンドル系統", name: "ハンドルブレース取り付け", price: 1700, bringIn: 3400, notes: "カウル脱着別途" },
-    { id: "handle_smartphone", cat: "ハンドル系統", name: "スマホホルダー取り付け", price: 1700, bringIn: 3400, notes: "電源取り出しタイプ9900円" },
-    { id: "handle_brake_cable_f", cat: "ハンドル系統", name: "ブレーキケーブル交換（フロント）", price: 4100, bringIn: 8200, notes: "カウル脱着別途" },
-    { id: "handle_brake_cable_r", cat: "ハンドル系統", name: "ブレーキケーブル交換（リア）", price: 4100, bringIn: 8200, notes: "カウル脱着別途" },
-    { id: "handle_wire_oil", cat: "ハンドル系統", name: "ワイヤー注油作業（1個所）", price: 3300, notes: "カウル脱着別途" },
-
-    // ブレーキ系統
-    { id: "brake_caliper_single", cat: "ブレーキ系統", name: "キャリパー交換（シングル）", price: 9900, bringIn: 19800, notes: "カウル脱着別途、ブレーキフルード代込、純正6100円" },
-    { id: "brake_caliper_double", cat: "ブレーキ系統", name: "キャリパー交換（ダブル）", price: 11600, bringIn: 23200, notes: "カウル脱着別途、ブレーキフルード代込、純正8600円" },
-    { id: "brake_caliper_oh_single", cat: "ブレーキ系統", name: "片押しキャリパーOH", price: 9900, bringIn: 19800, notes: "カウル脱着別途、片押しキャリパー1個、ブレーキフルード代込、状態により時間変動" },
-    { id: "brake_caliper_oh_opposed", cat: "ブレーキ系統", name: "対向キャリパーOH", price: 11600, bringIn: 23200, notes: "カウル脱着別途、対向キャリパー1個、ブレーキフルード代込、状態により時間変動" },
-    { id: "brake_caliper_clean", cat: "ブレーキ系統", name: "キャリパー清掃", price: 2640, notes: "カウル脱着別途、ピストン清掃、グリスアップ" },
-    { id: "brake_pad", cat: "ブレーキ系統", name: "ブレーキパッド交換（1キャリパー）", price: 2640, bringIn: 5280, notes: "清掃含む、マフラー・カウル脱着別途、ホイール脱着別途" },
-    { id: "brake_fluid", cat: "ブレーキ系統", name: "ブレーキフルード交換（1ライン）フルード代別", price: 2500, bringIn: 5000, notes: "カウル脱着別途、ブレーキフルード代別" },
-    { id: "brake_fluid_inc", cat: "ブレーキ系統", name: "ブレーキフルード交換（1ライン）フルード代込", price: 2900, notes: "カウル脱着別途、ブレーキフルード代込" },
-    { id: "brake_hose_single", cat: "ブレーキ系統", name: "ブレーキホース交換（シングル）", price: 6600, bringIn: 13200, notes: "カウル脱着別途、付帯パーツ脱着別途、ブレーキフルード別途、ABS車作業不可の場合有、ABS付きは2倍" },
-    { id: "brake_hose_double", cat: "ブレーキ系統", name: "ブレーキホース交換（ダブル）", price: 9900, bringIn: 19800, notes: "カウル脱着別途、付帯パーツ脱着別途、ブレーキフルード別途、ABS車作業不可の場合有、ABS付きは2倍" },
-    { id: "brake_hose_rear", cat: "ブレーキ系統", name: "ブレーキホース交換（リア）", price: 6600, bringIn: 13200, notes: "カウル脱着別途、付帯パーツ脱着別途、ブレーキフルード別途、ABS車作業不可の場合有、ABS付きは2倍" },
-    { id: "brake_lever", cat: "ブレーキ系統", name: "ブレーキレバー交換（1本）", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "brake_rotor_with_tire", cat: "ブレーキ系統", name: "ブレーキローター交換（1枚）タイヤ同時交換", price: 1700, bringIn: 3400, notes: "ローターボルト必ず交換" },
-    { id: "brake_master", cat: "ブレーキ系統", name: "マスターシリンダー取付（交換）", price: 7400, bringIn: 14800, notes: "カウル脱着別途、ブレーキフルード代込" },
-    { id: "brake_master_oh_clutch", cat: "ブレーキ系統", name: "マスターシリンダーOH（クラッチ）", price: 9900, bringIn: 19800, notes: "カウル脱着別途、ブレーキフルード代込、状態により時間変動" },
-    { id: "brake_master_oh_brake", cat: "ブレーキ系統", name: "マスターシリンダーOH（ブレーキ）", price: 9900, bringIn: 19800, notes: "カウル脱着別途、ブレーキフルード代込、状態により時間変動" },
-
-    // ブレーキシュー交換（タイヤ交換と同額）
-    { id: "brake_shoe_harley_f", cat: "ブレーキ系統", name: "ブレーキシュー交換（ハーレー・フロント）", price: 8800, bringIn: 17600, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_harley_r", cat: "ブレーキ系統", name: "ブレーキシュー交換（ハーレー・リア）", price: 11000, bringIn: 22000, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_split_f", cat: "ブレーキ系統", name: "ブレーキシュー交換（合わせホイール・フロント）", price: 5700, bringIn: 11400, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_split_r", cat: "ブレーキ系統", name: "ブレーキシュー交換（合わせホイール・リア）", price: 6800, bringIn: 13600, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_split_bring", cat: "ブレーキ系統", name: "ブレーキシュー交換（ホイール持込合わせ）", price: 4000, bringIn: 8000, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_scooter_f_125", cat: "ブレーキ系統", name: "ブレーキシュー交換（国産スクーター～125cc・フロント）", price: 4000, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_scooter_r_125", cat: "ブレーキ系統", name: "ブレーキシュー交換（国産スクーター～125cc・リア）", price: 5000, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_scooter_f_125_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（外車スクーター～125cc・フロント）", price: 6000, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_scooter_r_125_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（外車スクーター～125cc・リア）", price: 7500, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_big_scooter_f", cat: "ブレーキ系統", name: "ブレーキシュー交換（国産ビッグスクーター・フロント）", price: 4400, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_big_scooter_r", cat: "ブレーキ系統", name: "ブレーキシュー交換（国産ビッグスクーター・リア）", price: 5500, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_big_scooter_f_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（外車ビッグスクーター・フロント）", price: 6600, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_big_scooter_r_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（外車ビッグスクーター・リア）", price: 8200, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_f", cat: "ブレーキ系統", name: "ブレーキシュー交換（国産・フロント）", price: 4400, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_r", cat: "ブレーキ系統", name: "ブレーキシュー交換（国産・リア）", price: 5500, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_f_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（外車/社外ホイール・フロント）", price: 6600, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_r_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（外車/社外ホイール・リア）", price: 8200, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_wheel_bring", cat: "ブレーキ系統", name: "ブレーキシュー交換（ホイール持込・国産）", price: 2700, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-    { id: "brake_shoe_wheel_bring_import", cat: "ブレーキ系統", name: "ブレーキシュー交換（ホイール持込・外車）", price: 4000, notes: "タイヤ同時交換1500円、カムOH+1500円" },
-
-    // ブレーキローター（タイヤ交換と同額）
-    { id: "brake_rotor_harley_f", cat: "ブレーキ系統", name: "ブレーキローター交換（ハーレー・フロント）", price: 8800, bringIn: 17600, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_harley_r", cat: "ブレーキ系統", name: "ブレーキローター交換（ハーレー・リア）", price: 11000, bringIn: 22000, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_split_f", cat: "ブレーキ系統", name: "ブレーキローター交換（合わせホイール・フロント）", price: 5700, bringIn: 11400, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_split_r", cat: "ブレーキ系統", name: "ブレーキローター交換（合わせホイール・リア）", price: 6800, bringIn: 13600, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_split_bring", cat: "ブレーキ系統", name: "ブレーキローター交換（ホイール持込合わせ）", price: 4000, bringIn: 8000, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_scooter_f_125", cat: "ブレーキ系統", name: "ブレーキローター交換（国産スクーター～125cc・フロント）", price: 4000, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_scooter_r_125", cat: "ブレーキ系統", name: "ブレーキローター交換（国産スクーター～125cc・リア）", price: 5000, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_scooter_f_125_import", cat: "ブレーキ系統", name: "ブレーキローター交換（外車スクーター～125cc・フロント）", price: 6000, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_scooter_r_125_import", cat: "ブレーキ系統", name: "ブレーキローター交換（外車スクーター～125cc・リア）", price: 7500, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_big_scooter_f", cat: "ブレーキ系統", name: "ブレーキローター交換（国産ビッグスクーター・フロント）", price: 4400, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_big_scooter_r", cat: "ブレーキ系統", name: "ブレーキローター交換（国産ビッグスクーター・リア）", price: 5500, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_big_scooter_f_import", cat: "ブレーキ系統", name: "ブレーキローター交換（外車ビッグスクーター・フロント）", price: 6600, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_big_scooter_r_import", cat: "ブレーキ系統", name: "ブレーキローター交換（外車ビッグスクーター・リア）", price: 8200, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_f", cat: "ブレーキ系統", name: "ブレーキローター交換（国産・フロント）", price: 4400, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_r", cat: "ブレーキ系統", name: "ブレーキローター交換（国産・リア）", price: 5500, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_f_import", cat: "ブレーキ系統", name: "ブレーキローター交換（外車/社外ホイール・フロント）", price: 6600, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_r_import", cat: "ブレーキ系統", name: "ブレーキローター交換（外車/社外ホイール・リア）", price: 8200, notes: "タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_wheel_bring", cat: "ブレーキ系統", name: "ブレーキローター交換（ホイール持込・国産）", price: 2700, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-    { id: "brake_rotor_wheel_bring_import", cat: "ブレーキ系統", name: "ブレーキローター交換（ホイール持込・外車）", price: 4000, notes: "ダブルディスク+1700円、タイヤ同時1700円、ローターボルト必ず交換" },
-
-    // リアボックス系統
-    { id: "box_fitting_general", cat: "リアボックス系統", name: "汎用トップケース用フィッティング取付", price: 4100, bringIn: 8200, notes: "リアキャリア付きに取付" },
-    { id: "box_fitting_top", cat: "リアボックス系統", name: "車種別トップケース用フィッティング取付", price: 5800, bringIn: 11600, notes: "穴あけ加工、カウル脱着別途" },
-    { id: "box_fitting_side", cat: "リアボックス系統", name: "車種別サイドケース用フィッティング取付", price: 9100, bringIn: 18200, notes: "穴あけ加工、カウル脱着別途" },
-    { id: "box_fitting_full", cat: "リアボックス系統", name: "車種別トップ＋サイドケース用フィッティング取付", price: 11600, bringIn: 23200, notes: "穴あけ加工、カウル脱着別途" },
-
-    // レーシングサービス
-    { id: "race_mechanic", cat: "レーシングサービス", name: "メカニック帯同（1日）", price: 33000, notes: "交通費別途、ピットクルーライセンス登録含む" },
-    { id: "race_data_logging", cat: "レーシングサービス", name: "データロギング", price: 11000 },
-    { id: "race_setup", cat: "レーシングサービス", name: "マシンセットアップ", price: 11000 },
-    { id: "race_full_pack", cat: "レーシングサービス", name: "フルパック（1日）", price: 44000 },
-
-    // 吸排気系統
-    { id: "intake_air", cat: "吸排気系統", name: "エアエレメント交換", price: 2500, bringIn: 5000, notes: "カウル、タンク脱着別途" },
-    { id: "intake_carb_oh_125", cat: "吸排気系統", name: "キャブレターOH（～125cc）", price: 9900, notes: "タンク脱着込、キャブレター脱着込、同調/CO・HC測定込、連結部分解別途、車種により対応不可、状態により追加料金" },
-    { id: "intake_carb_oh_single", cat: "吸排気系統", name: "キャブレターOH（シングル）", price: 14900, notes: "タンク脱着込、キャブレター脱着込、同調/CO・HC測定込、連結部分解別途、車種により対応不可、状態により追加料金" },
-    { id: "intake_carb_oh_2cyl", cat: "吸排気系統", name: "キャブレターOH（2気筒）", price: 24800, notes: "タンク脱着込、キャブレター脱着込、同調/CO・HC測定込、連結部分解別途、車種により対応不可、状態により追加料金" },
-    { id: "intake_carb_oh_3cyl", cat: "吸排気系統", name: "キャブレターOH（3気筒以上）", price: 33000, notes: "タンク脱着込、キャブレター脱着込、同調/CO・HC測定込、連結部分解別途、車種により対応不可、状態により追加料金" },
-    { id: "exhaust_multi", cat: "吸排気系統", name: "マフラー交換（2気筒以上）", price: 14900, bringIn: 29800, notes: "カウル脱着別途、排気デバイス別途" },
-    { id: "exhaust_single", cat: "吸排気系統", name: "マフラー交換（シングル・スクーター）", price: 6600, bringIn: 13200, notes: "カウル脱着別途、排気デバイス別途" },
-    { id: "exhaust_slipon", cat: "吸排気系統", name: "マフラー交換（スリップオン）", price: 5000, bringIn: 10000, notes: "カウル脱着別途、排気デバイス別途" },
-    { id: "exhaust_special", cat: "吸排気系統", name: "マフラー交換（特殊・V型、センター出し）", price: 29700, bringIn: 59400, notes: "カウル脱着別途、排気デバイス別途" },
-    { id: "exhaust_remove_multi", cat: "吸排気系統", name: "マフラー脱着（2気筒以上）", price: 14900, bringIn: 29800, notes: "ガスケット別途、保安基準違反作業不可" },
-{ id: "exhaust_remove_single", cat: "吸排気系統", name: "マフラー脱着（シングル・スクーター）", price: 6600, bringIn: 13200, notes: "ガスケット別途、保安基準違反作業不可" },
-{ id: "exhaust_remove_slipon", cat: "吸排気系統", name: "マフラー脱着（スリップオン）", price: 5000, bringIn: 10000, notes: "ガスケット別途、保安基準違反作業不可" },
-{ id: "exhaust_remove_special", cat: "吸排気系統", name: "マフラー脱着（特殊・V型、センター出し）", price: 29700, bringIn: 59400, notes: "ガスケット別途、保安基準違反作業不可" },
-
-    // 溶接修理
-    { id: "weld_repair", cat: "溶接修理", name: "溶接修理（1箇所）", price: 10000, notes: "パーツ脱着別途" },
-    { id: "weld_reinforce", cat: "溶接修理", name: "補強溶接", price: 13000, notes: "パーツ脱着別途" },
-    { id: "weld_frame_gusset", cat: "溶接修理", name: "フレームガセット溶接（1箇所）", price: 13000, notes: "パーツ脱着別途" },
-    { id: "weld_muffler", cat: "溶接修理", name: "マフラー溶接（1箇所）", price: 5000, notes: "パーツ脱着別途" },
-
-    // 潤滑・冷却系統
-    { id: "cool_llc_126", cat: "潤滑・冷却系統", name: "LLC交換（126cc～）", price: 8600, bringIn: 17200, notes: "クーラント液代金、カウル、タンク脱着含む、車種により時間変動（エア抜き必要）" },
-    { id: "cool_llc_125", cat: "潤滑・冷却系統", name: "LLC交換（～125cc）", price: 5500, bringIn: 11000, notes: "クーラント液代金、カウル、タンク脱着含む、車種により時間変動（エア抜き必要）" },
-    { id: "oil_change", cat: "潤滑・冷却系統", name: "オイル交換", price: 1100, bringIn: 2200, notes: "パーツ脱着が必要な場合別途工賃" },
-    { id: "oil_element", cat: "潤滑・冷却系統", name: "オイル＋エレメント交換", price: 1980, bringIn: 3960, notes: "パーツ脱着が必要な場合別途工賃、DCTフィルター+880円" },
-    { id: "oil_cooler", cat: "潤滑・冷却系統", name: "オイルクーラー取り付け", price: 16500, bringIn: 33000, notes: "カウル、マフラー脱着含まず、オイル代別途" },
-    { id: "oil_gear", cat: "潤滑・冷却系統", name: "ギアオイル交換", price: 1320, bringIn: 2640, notes: "カウル脱着別途" },
-    { id: "cool_water_temp", cat: "潤滑・冷却系統", name: "水温計取り付け", price: 9900, bringIn: 19800, notes: "タンク、カウル脱着、LLC交換別途+8600円（原付+5500円）" },
-    { id: "oil_flushing", cat: "潤滑・冷却系統", name: "フラッシング", price: 1000, bringIn: 2000 },
-    { id: "oil_temp", cat: "潤滑・冷却系統", name: "油温計取り付け", price: 9900, bringIn: 19800, notes: "カウル脱着別途" },
-    { id: "cool_radiator", cat: "潤滑・冷却系統", name: "ラジエター交換", price: 24800, bringIn: 49600, notes: "タンク脱着含む、カウル脱着別途" },
-    { id: "oil_harley_engine", cat: "潤滑・冷却系統", name: "ハーレーエンジンオイル交換", price: 1100, bringIn: 2200, notes: "カウル脱着別途" },
-    { id: "oil_harley_element", cat: "潤滑・冷却系統", name: "ハーレーオイルエレメント交換", price: 1980, bringIn: 3960, notes: "カウル脱着別途" },
-    { id: "oil_harley_primary", cat: "潤滑・冷却系統", name: "ハーレープライマリーオイル交換", price: 1320, bringIn: 2640, notes: "カウル脱着別途" },
-    { id: "oil_harley_trans", cat: "潤滑・冷却系統", name: "ハーレートランスミッションオイル交換", price: 1320, bringIn: 2640, notes: "カウル脱着別途" },
-
-    // 車体・外装系統
-    { id: "body_inner_fender", cat: "車体・外装系統", name: "インナーフェンダー脱着", price: 3300, bringIn: 6600, notes: "タイヤ脱着含まず（リアフェンダー）" },
-    { id: "body_cowl_remove", cat: "車体・外装系統", name: "カウル脱着（1箇所）", price: 900, notes: "フルカウル左右各900円、アッパー5400円、アンダー900円、リヤ左右各900円、ビッグスクーター：フロント7200円、サイド1800円、ステップ3600円、リヤ4500円" },
-    { id: "body_rear_carrier", cat: "車体・外装系統", name: "リアキャリア取り付け", price: 5000, bringIn: 10000, notes: "穴あけ加工、カウル脱着別途" },
-    { id: "body_rear_box", cat: "車体・外装系統", name: "リヤBOX取り付け", price: 4100, bringIn: 8200, notes: "ストップランプ付き+1500円、すでにキャリアが付いている物への取付" },
-    { id: "body_grab_bar", cat: "車体・外装系統", name: "グラブバー取り付け（タンデムグリップ）", price: 5000, bringIn: 10000, notes: "カウル脱着&加工別途" },
-    { id: "body_side_stand", cat: "車体・外装系統", name: "サイドスタンド交換", price: 3300, bringIn: 6600, notes: "カウル脱着&加工別途" },
-    { id: "body_side_bag", cat: "車体・外装系統", name: "サイドバッグ取り付け", price: 4100, bringIn: 8200, notes: "カウル脱着別途" },
-    { id: "body_sub_frame", cat: "車体・外装系統", name: "サブフレーム取り付け", price: 9900, bringIn: 19800, notes: "カウル脱着&加工別途" },
-    { id: "body_sissy_bar", cat: "車体・外装系統", name: "シーシーバー取り付け", price: 5000, bringIn: 11000, notes: "カウル脱着&加工別途" },
-    { id: "body_seat", cat: "車体・外装系統", name: "シート脱着", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "body_seat_cowl", cat: "車体・外装系統", name: "シートカウル脱着", price: 5000, bringIn: 10000 },
-    { id: "body_seat_cover", cat: "車体・外装系統", name: "シートカバー取り付け", price: 2500, bringIn: 5000, notes: "ビッグスクーター5000円" },
-    { id: "body_screen", cat: "車体・外装系統", name: "スクリーン脱着", price: 3300, bringIn: 6600, notes: "カウル脱着別途" },
-    { id: "body_step", cat: "車体・外装系統", name: "ステップ交換（1個）", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "body_step_board", cat: "車体・外装系統", name: "ステップボード交換", price: 5000, bringIn: 10000, notes: "電飾付き+9900円" },
-    { id: "body_stem_bearing", cat: "車体・外装系統", name: "ステムベアリング交換", price: 24800, bringIn: 49600, notes: "カウル脱着別途" },
-    { id: "body_center_stand", cat: "車体・外装系統", name: "センタースタンド交換", price: 4100, bringIn: 8200, notes: "カウル脱着&加工別途" },
-    { id: "body_center_stand_stopper", cat: "車体・外装系統", name: "センタースタンドストッパー交換", price: 2500, bringIn: 5000, notes: "カウル脱着&加工別途" },
-    { id: "body_stand_oil", cat: "車体・外装系統", name: "スタンド注油（1箇所）", price: 800, notes: "サイドスタンド、センタースタンド共に1箇所の値段" },
-    { id: "body_tank_remove", cat: "車体・外装系統", name: "タンク脱着", price: 2500, bringIn: 5000 },
-    { id: "body_tank_pad", cat: "車体・外装系統", name: "タンクパット取り付け", price: 1700, bringIn: 3400 },
-    { id: "body_tandem_bar", cat: "車体・外装系統", name: "タンデムバー取り付け", price: 5000, bringIn: 10000, notes: "カウル脱着、加工別途" },
-    { id: "body_back_step", cat: "車体・外装系統", name: "バックステップ取り付け", price: 24800, bringIn: 49600, notes: "カウル脱着別途、ピストンロッド交換含む" },
-    { id: "body_backrest", cat: "車体・外装系統", name: "バックレスト取り付け", price: 5000, bringIn: 11000, notes: "カウル脱着別途" },
-    { id: "body_bikini_cowl", cat: "車体・外装系統", name: "ビキニカウル取り付け", price: 5000, bringIn: 11000 },
-    { id: "body_fenderless", cat: "車体・外装系統", name: "フェンダーレスキット取り付け", price: 9900, bringIn: 19800, notes: "カウル脱着別途" },
-    { id: "body_front_fender", cat: "車体・外装系統", name: "フロントフェンダー", price: 5000, bringIn: 10000 },
-    { id: "body_mirror", cat: "車体・外装系統", name: "ミラー交換（1個）", price: 800, bringIn: 1600, notes: "カウル脱着別途、保安基準違反作業不可" },
-    { id: "body_reflector", cat: "車体・外装系統", name: "リフレクター取り付け（反射板）", price: 1700, bringIn: 3400, notes: "カウル脱着別途" },
-
-    // 車検関連
-    { id: "inspect_legal", cat: "車検（２輪）", name: "法定点検一式（2輪）", price: 24000, notes: "点検および調整含む" },
-    { id: "inspect_proxy", cat: "車検（２輪）", name: "車検代行費用", price: 10000 },
-    { id: "basic_fee", cat: "車検（２輪）", name: "車検整備基本料", price: 19800 },
-
-    // 電装品系統
-    { id: "elec_etc_cowl", cat: "電装品系統", name: "ETC取り付け（カウル付き・スクーター）", price: 15840, bringIn: 31680, notes: "カウル、タンク脱着含む、取り外し半額、再取り付け通常工賃" },
-    { id: "elec_etc_naked", cat: "電装品系統", name: "ETC取り付け（ネイキッド）", price: 9240, bringIn: 18480, notes: "タンク脱着含む、取り外し半額、再取り付け通常工賃" },
-    { id: "elec_etc_off", cat: "電装品系統", name: "ETC取り付け（オフ車・アメリカン）", price: 12540, bringIn: 25080, notes: "カウル、タンク脱着含む、取り外し半額、再取り付け通常工賃" },
-    { id: "elec_etc_setup", cat: "電装品系統", name: "ETC セットアップ", price: 2750 },
-    { id: "elec_fi_controller", cat: "電装品系統", name: "FIコントローラー取り付け", price: 14900, bringIn: 29800, notes: "F周りカウル脱着含む、汎用商品作業不可" },
-    { id: "elec_switch_box", cat: "電装品系統", name: "スイッチボックス取り付け（1個）", price: 3300, bringIn: 6600, notes: "カウル脱着別途" },
-    { id: "elec_voltmeter", cat: "電装品系統", name: "電圧計取り付け", price: 9900, bringIn: 19800, notes: "カウル脱着別途、加工別途" },
-    { id: "elec_power_acc", cat: "電装品系統", name: "電源取り出し（アクセサリーのみ）", price: 8800, bringIn: 17600, notes: "タンク・カウル脱着含む、ナビ同時半額" },
-    { id: "elec_power_batt_naked", cat: "電装品系統", name: "電源取り出し（バッテリー電源・ネイキッド）", price: 11000, bringIn: 22000, notes: "タンク・カウル脱着含む、ナビ同時半額" },
-    { id: "elec_power_batt_cowl", cat: "電装品系統", name: "電源取り出し（バッテリー電源・スクーター/カウル付）", price: 18700, bringIn: 37400, notes: "タンク・カウル脱着含む、ナビ同時半額" },
-    { id: "elec_security", cat: "電装品系統", name: "盗難防止機取り付け", price: 9900, bringIn: 19800, notes: "タンク、カウル脱着別途、センサー取付、配線加工別途" },
-    { id: "elec_dashcam_naked", cat: "電装品系統", name: "ドライブレコーダー取付（ネイキッド）", price: 12900, bringIn: 25800, notes: "本体12900円、カメラ1つ6100円、GPS1500円、外装脱着含む" },
-    { id: "elec_dashcam_american", cat: "電装品系統", name: "ドライブレコーダー取付（アメリカン・オフロード）", price: 16500, bringIn: 33000, notes: "本体16500円、カメラ1つ6100円、GPS1500円、外装脱着含む" },
-    { id: "elec_dashcam_cowl", cat: "電装品系統", name: "ドライブレコーダー取付（カウル付・スクーター）", price: 19800, bringIn: 39600, notes: "本体19800円、カメラ1つ6100円、GPS1500円、外装脱着含む" },
-    { id: "elec_navi", cat: "電装品系統", name: "ナビ取り付け", price: 11600, bringIn: 23200, notes: "カウル、タンク脱着含む" },
-    { id: "elec_battery", cat: "電装品系統", name: "バッテリー交換", price: 1650, bringIn: 3300, notes: "カウル、タンク、エアクリーナーボックス、マフラー脱着別途" },
-    { id: "elec_battery_charge", cat: "電装品系統", name: "バッテリー充電", price: 1650, notes: "バッテリー単体持込、車載時別途脱着工賃、状態により時間変動" },
-    { id: "elec_fuse", cat: "電装品系統", name: "ヒューズ交換（1ヶ所）", price: 800, bringIn: 1600, notes: "カウル、タンク脱着別途" },
-    { id: "elec_fog_lamp", cat: "電装品系統", name: "フォグランプ取り付け", price: 13200, bringIn: 26400, notes: "カウル脱着・加工別途" },
-    { id: "elec_plug", cat: "電装品系統", name: "プラグ交換（1本）", price: 1000, bringIn: 2000, notes: "カウル、タンク脱着別途、車種により時間変動" },
-    { id: "elec_plug_cap", cat: "電装品系統", name: "プラグキャップ交換（1個）", price: 1000, bringIn: 2000, notes: "カウル、タンク脱着別途" },
-    { id: "elec_plug_cord", cat: "電装品系統", name: "プラグコード交換（1本）", price: 1700, bringIn: 3400, notes: "カウル、タンク脱着別途" },
-    { id: "elec_horn", cat: "電装品系統", name: "ホーン交換", price: 3300, bringIn: 6600, notes: "カウル、外装脱着別途" },
-    { id: "elec_hot_grip_naked", cat: "電装品系統", name: "ホットグリップ取り付け（ネイキッド・アメリカン）", price: 14000, bringIn: 28000, notes: "巻きタイプ-2500円、アクセルホルダー加工+1500円" },
-    { id: "elec_hot_grip_125", cat: "電装品系統", name: "ホットグリップ取り付け（～125ccスクーター）", price: 14900, bringIn: 29800, notes: "巻きタイプ-2500円、アクセルホルダー加工+1500円" },
-    { id: "elec_hot_grip_big", cat: "電装品系統", name: "ホットグリップ取り付け（ビッグスクーター・カウル付き）", price: 16500, bringIn: 33000, notes: "巻きタイプ-2500円、アクセルホルダー加工+1500円" },
-    { id: "elec_hot_grip_relay", cat: "電装品系統", name: "ホットグリップ追加リレー", price: 5000, bringIn: 10000, notes: "カウル脱着別途" },
-    { id: "elec_radar", cat: "電装品系統", name: "レーダー取り付け", price: 9900, bringIn: 19800, notes: "カウル、タンク脱着・加工別途" },
-
-    // ライト・ウインカー系統
-    { id: "light_winker", cat: "ライト・ウインカー系統", name: "ウィンカー交換（1ヶ所）", price: 3300, bringIn: 6600, notes: "カウル脱着別途" },
-    { id: "light_winker_bulb", cat: "ライト・ウインカー系統", name: "ウィンカー/テール バルブ交換（1ヶ所）", price: 800, bringIn: 1600, notes: "カウル脱着別途" },
-    { id: "light_winker_lens", cat: "ライト・ウインカー系統", name: "ウィンカー/テール レンズ交換（1ヶ所）", price: 800, bringIn: 1600, notes: "カウル脱着別途" },
-    { id: "light_winker_relay", cat: "ライト・ウインカー系統", name: "ウィンカーリレー交換", price: 1700, bringIn: 3400, notes: "カウル脱着別途" },
-    { id: "light_led_v125", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（アドレスV125）", price: 7400, bringIn: 14800, notes: "カウル脱着含む" },
-    { id: "light_led_pcx", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（PCX125）", price: 14000, bringIn: 28000, notes: "カウル脱着含む" },
-    { id: "light_led_ape", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（APE・モンキー）", price: 7400, bringIn: 14800, notes: "タンク脱着含む" },
-    { id: "light_led_naked", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（ネイキッド）", price: 5000, bringIn: 10000, notes: "カウル脱着、加工含む" },
-    { id: "light_led_cowl_1", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（カウル付き・スクーター1灯）", price: 11600, bringIn: 23200, notes: "カウル脱着、加工含む" },
-    { id: "light_led_cowl_2", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（カウル付き・スクーター2灯）", price: 14900, bringIn: 29800, notes: "カウル脱着、加工含む" },
-    { id: "light_led_no_harness", cat: "ライト・ウインカー系統", name: "LEDヘッドライト交換（ハーネス無し）", price: 1700, bringIn: 3400, notes: "ライジングα等、カウル脱着、加工別途" },
-    { id: "light_tail_assy", cat: "ライト・ウインカー系統", name: "テールランプASSY交換", price: 9900, bringIn: 19800, notes: "ビッグスクーター、カウル脱着別途" },
-    { id: "light_tail_bulb", cat: "ライト・ウインカー系統", name: "テールランプ球交換", price: 800, bringIn: 1600, notes: "カウル脱着別途" },
-    { id: "light_tail_lens", cat: "ライト・ウインカー系統", name: "テールレンズ交換（1ヶ所）", price: 800, bringIn: 1600, notes: "カウル脱着別途" },
-    { id: "light_number_bulb", cat: "ライト・ウインカー系統", name: "ナンバー球交換", price: 800, bringIn: 1600, notes: "カウル脱着別途" },
-    { id: "light_number_lamp", cat: "ライト・ウインカー系統", name: "ナンバーランプ取り付け（後付）", price: 5800, bringIn: 11600, notes: "カウル脱着・加工別途" },
-    { id: "light_brake_bulb", cat: "ライト・ウインカー系統", name: "ブレーキ球交換（1個）", price: 800, bringIn: 1600, notes: "カウル、タンク脱着別途" },
-    { id: "light_headlight_kit", cat: "ライト・ウインカー系統", name: "ヘッドライトキット取り付け", price: 7400, bringIn: 14800, notes: "カウル脱着別途" },
-    { id: "light_headlight_stay", cat: "ライト・ウインカー系統", name: "ヘッドライトステー取り付け", price: 5000, bringIn: 10000, notes: "トップブリッジ、カウル脱着別途" },
-    { id: "light_headlight_bulb", cat: "ライト・ウインカー系統", name: "ヘッドライトバルブ交換（1個）", price: 1700, bringIn: 3400, notes: "カウル脱着別途" },
-    { id: "light_headlight_bulb_scooter", cat: "ライト・ウインカー系統", name: "ヘッドライトバルブ交換（原付スクーター）", price: 2500, bringIn: 5000, notes: "左右ミラー、ヘッドライトカバー脱着含む" },
-    { id: "light_headlight_booster", cat: "ライト・ウインカー系統", name: "ヘッドライトブースター取り付け", price: 9900, bringIn: 19800, notes: "カウル脱着別途" },
-
-    // 駆動系統
-    { id: "drive_125", cat: "駆動系統", name: "駆動系脱着（～125ccまで）", price: 6600, bringIn: 13200, notes: "カウル脱着別途、プーリー側、クラッチ側片方、同時+2500円" },
-    { id: "drive_126", cat: "駆動系統", name: "駆動系脱着（126cc以上）", price: 9900, bringIn: 19800, notes: "カウル脱着別途、プーリー側、クラッチ側片方、同時+2500円" },
-    { id: "drive_sprocket", cat: "駆動系統", name: "スプロケット交換（1箇所）", price: 6600, bringIn: 13200, notes: "カウル脱着別途、マフラー脱着別途" },
-    { id: "drive_sprocket_chain", cat: "駆動系統", name: "スプロケット交換（前後）＋チェーン", price: 14900, bringIn: 29800, notes: "カウル脱着別途、クリップタイプ12100円" },
-    { id: "drive_sprocket_stud", cat: "駆動系統", name: "スプロケットスタッドボルト打ち換え（1本）", price: 1300, bringIn: 2600, notes: "カウル脱着別途、スプロケット交換含む" },
-    { id: "drive_chain_clip", cat: "駆動系統", name: "チェーン交換（クリップジョイント）", price: 3800, bringIn: 7600, notes: "カウル脱着別途" },
-    { id: "drive_chain_rivet", cat: "駆動系統", name: "チェーン交換（カシメジョイント）", price: 6600, bringIn: 13200, notes: "カウル脱着別途" },
-    { id: "drive_chain_adjust", cat: "駆動系統", name: "チェーン調整", price: 2500, notes: "清掃、注油別料金、カウル脱着別途" },
-    { id: "drive_chain_clean", cat: "駆動系統", name: "チェーン清掃/注油", price: 3300, notes: "カウル脱着別途、チェーン調整別料金" },
-    { id: "drive_chain_clean_rk", cat: "駆動系統", name: "チェーン清掃/注油（レイキッシュ）", price: 4000, notes: "カウル脱着別途、チェーン調整別料金" },
-    { id: "drive_chain_oil", cat: "駆動系統", name: "チェーン注油のみ", price: 1700, notes: "カウル脱着別途、清掃別料金" },
-    { id: "drive_chain_oil_rk", cat: "駆動系統", name: "チェーン注油のみ（レイキッシュ）", price: 2400, notes: "カウル脱着別途、清掃別料金" },
-    { id: "drive_belt_125", cat: "駆動系統", name: "ドライブベルト交換（～125cc）", price: 6600, bringIn: 13200, notes: "カウル脱着別途" },
-    { id: "drive_belt_126", cat: "駆動系統", name: "ドライブベルト交換（126cc～）", price: 9900, bringIn: 19800, notes: "カウル脱着別途" },
-    { id: "drive_clutch_plate", cat: "駆動系統", name: "クラッチプレート交換", price: 14900, bringIn: 29800, notes: "カウル脱着別途、ガスケット別途" },
-    { id: "drive_clutch_fluid", cat: "駆動系統", name: "クラッチフルード交換（フルード代別）", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "drive_clutch_hose", cat: "駆動系統", name: "クラッチホース交換", price: 9900, bringIn: 19800, notes: "カウル脱着別途、ブレーキフルード代込" },
-    { id: "drive_clutch_lever", cat: "駆動系統", name: "クラッチレバー交換", price: 2500, bringIn: 5000, notes: "カウル脱着別途" },
-    { id: "drive_clutch_wire", cat: "駆動系統", name: "クラッチワイヤー交換", price: 4100, bringIn: 8200, notes: "タンク、カウル脱着別途" },
-    { id: "drive_crankcase_cover", cat: "駆動系統", name: "クランクケースカバー交換", price: 5000, bringIn: 10000, notes: "カウル加工別途、ガスケット別途" },
-
-    // ハブダンパー（タイヤ交換と同額）
-    { id: "drive_hub_damper_harley_f", cat: "駆動系統", name: "ハブダンパー交換（ハーレー・フロント）", price: 8800, bringIn: 17600 },
-    { id: "drive_hub_damper_harley_r", cat: "駆動系統", name: "ハブダンパー交換（ハーレー・リア）", price: 11000, bringIn: 22000 },
-    { id: "drive_hub_damper_split_f", cat: "駆動系統", name: "ハブダンパー交換（合わせホイール・フロント）", price: 5700, bringIn: 11400 },
-    { id: "drive_hub_damper_split_r", cat: "駆動系統", name: "ハブダンパー交換（合わせホイール・リア）", price: 6800, bringIn: 13600 },
-    { id: "drive_hub_damper_split_bring", cat: "駆動系統", name: "ハブダンパー交換（ホイール持込合わせ）", price: 4000, bringIn: 8000 },
-    { id: "drive_hub_damper_scooter_f_125", cat: "駆動系統", name: "ハブダンパー交換（国産スクーター～125cc・フロント）", price: 4000 },
-    { id: "drive_hub_damper_scooter_r_125", cat: "駆動系統", name: "ハブダンパー交換（国産スクーター～125cc・リア）", price: 5000 },
-    { id: "drive_hub_damper_scooter_f_125_import", cat: "駆動系統", name: "ハブダンパー交換（外車スクーター～125cc・フロント）", price: 6000 },
-    { id: "drive_hub_damper_scooter_r_125_import", cat: "駆動系統", name: "ハブダンパー交換（外車スクーター～125cc・リア）", price: 7500 },
-    { id: "drive_hub_damper_big_scooter_f", cat: "駆動系統", name: "ハブダンパー交換（国産ビッグスクーター・フロント）", price: 4400 },
-    { id: "drive_hub_damper_big_scooter_r", cat: "駆動系統", name: "ハブダンパー交換（国産ビッグスクーター・リア）", price: 5500 },
-    { id: "drive_hub_damper_big_scooter_f_import", cat: "駆動系統", name: "ハブダンパー交換（外車ビッグスクーター・フロント）", price: 6600 },
-    { id: "drive_hub_damper_big_scooter_r_import", cat: "駆動系統", name: "ハブダンパー交換（外車ビッグスクーター・リア）", price: 8200 },
-    { id: "drive_hub_damper_f", cat: "駆動系統", name: "ハブダンパー交換（国産・フロント）", price: 4400 },
-    { id: "drive_hub_damper_r", cat: "駆動系統", name: "ハブダンパー交換（国産・リア）", price: 5500 },
-    { id: "drive_hub_damper_f_import", cat: "駆動系統", name: "ハブダンパー交換（外車/社外ホイール・フロント）", price: 6600 },
-    { id: "drive_hub_damper_r_import", cat: "駆動系統", name: "ハブダンパー交換（外車/社外ホイール・リア）", price: 8200 },
-    { id: "drive_hub_damper_wheel_bring", cat: "駆動系統", name: "ハブダンパー交換（ホイール持込・国産）", price: 2700 },
-    { id: "drive_hub_damper_wheel_bring_import", cat: "駆動系統", name: "ハブダンパー交換（ホイール持込・外車）", price: 4000 },
 
     // その他作業・一般工賃
     { id: "general_domestic", cat: "その他作業・一般工賃", name: "国産車（1時間）", price: 10000 },
@@ -461,6 +86,7 @@ export default function AppClient() {
         date: todayISO(),
         invoiceNo: "INV-" + todayISO().replaceAll("-", "") + "-001",
         docTitle: "車検見積書", // ★追加：初期タイトル
+        remarks: "",  
     });
     // 事業者情報
     const [settings, setSettings] = useState({
@@ -488,21 +114,8 @@ export default function AppClient() {
     });
 
     // --- 技術料など（課税）：単価・個数（値引き/預り金は金額） ---
-    const [fees, setFees] = useState<Fees>({
-        partsExchangeTech: { unit: 0, qty: 0 },
-        proxy: { unit: 0, qty: 0 },
-        basic: { unit: 0, qty: 0 },
-        discount: 0,
-        deposit: 0,
-    });
-    const [feesDraft, setFeesDraft] = useState<FeesDraft>({
-        partsExchangeTech: { unit: "", qty: "" },
-        proxy: { unit: "", qty: "" },
-        basic: { unit: "", qty: "" },
-        discount: "",
-        deposit: "",
-    });
-
+const [fees, setFees] = useState<Fees>({ discount: 0, deposit: 0 });
+const [feesDraft, setFeesDraft] = useState<FeesDraft>({ discount: "", deposit: "" });
     // LocalStorage
     useEffect(() => {
         try {
@@ -532,9 +145,6 @@ export default function AppClient() {
     const legalTotal = jibaiLine
         + legal.weightTax.unit * legal.weightTax.qty
         + legal.stamp.unit * legal.stamp.qty;        // ① 非課税
-    const extrasTotal = fees.partsExchangeTech.unit * fees.partsExchangeTech.qty
-        + fees.proxy.unit * fees.proxy.qty
-        + fees.basic.unit * fees.basic.qty;     // 課税
     const nonTaxable = legalTotal;                                    // ①
 
     const customSubtotal = useMemo(
@@ -542,10 +152,15 @@ export default function AppClient() {
         [customParts]
     );
     // 課税対象合計を変更
-    const taxableBase = itemsSubtotal + customSubtotal + extrasTotal;      // ②
-    const taxableAfterDiscount = Math.max(0, taxableBase - Math.max(0, fees.discount || 0));
-    const grandTotal = nonTaxable + taxableAfterDiscount;                // ①+②（値引き後）
-    const finalDue = Math.max(0, grandTotal - Math.max(0, fees.deposit || 0));
+const taxableBase = itemsSubtotal + customSubtotal; // ②: 課税ベースは品目+手入力部品のみ
+const taxableAfterDiscount = Math.max(0, taxableBase - Math.max(0, fees.discount || 0));
+const grandTotal = nonTaxable + taxableAfterDiscount; // ①+②（値引き後）
+const finalDue = Math.max(0, grandTotal - Math.max(0, fees.deposit || 0));
+
+// 追加: 内消費税（テンプレの方針に合わせ「内税方式」で参考表示）
+const taxRate = settings.tax.rate ?? 0.10;
+const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
+
 
     // 追加・削除
     function addItem(svc: ServiceDef) {
@@ -913,36 +528,7 @@ export default function AppClient() {
 
                         {/* 技術料など（課税） 単価/個数 */}
                         <div className="mt-4 grid gap-2 text-sm">
-                            {([
-                                { key: "partsExchangeTech", label: "部品交換技術料" },
-                                { key: "proxy", label: "車検代行料" },
-                                { key: "basic", label: "車検整備基本料" },
-                            ] as { key: FeeKey; label: string }[]).map(({ key, label }) => (
-                                <div key={key} className="grid grid-cols-12 items-center gap-2">
-                                    <span className="col-span-6 sm:col-span-5">{label}</span>
-                                    <input
-                                        type="text" inputMode="numeric" pattern="\d*"
-                                        className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
-                                        placeholder="単価"
-                                        value={feesDraft[key].unit}
-                                        onChange={(e) => setFeesDraft((p) => ({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,]/g, '') } }))}
-                                        onBlur={() => setFees((p) => ({ ...p, [key]: { unit: toNum(feesDraft[key].unit), qty: p[key].qty } }))}
-                                    />
-                                    <input
-                                        type="text" inputMode="numeric" pattern="\d*"
-                                        className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
-                                        placeholder="個数"
-                                        value={feesDraft[key].qty}
-                                        onChange={(e) => setFeesDraft((p) => ({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,]/g, '') } }))}
-                                        onBlur={() => setFees((p) => ({ ...p, [key]: { unit: p[key].unit, qty: toNum(feesDraft[key].qty) } }))}
-                                    />
-                                    <div className="col-span-12 sm:col-span-2 text-right font-semibold">
-                                        {key === "partsExchangeTech" && yen(fees.partsExchangeTech.unit * fees.partsExchangeTech.qty)}
-                                        {key === "proxy" && yen(fees.proxy.unit * fees.proxy.qty)}
-                                        {key === "basic" && yen(fees.basic.unit * fees.basic.qty)}
-                                    </div>
-                                </div>
-                            ))}
+
 
                             {/* 値引き・預り金（金額） */}
                             <div className="grid grid-cols-12 items-center gap-2">
@@ -968,13 +554,31 @@ export default function AppClient() {
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between"><div>非課税小計(法定費用)</div><div className="font-semibold">{yen(nonTaxable)}</div></div>
-                            <div className="flex items-center justify-between"><div>10%対象合計(値引前)</div><div className="font-semibold">{yen(taxableBase)}</div></div>
-                            <div className="flex items-center justify-between"><div>合計(①+②)</div><div className="font-semibold">{yen(nonTaxable + taxableBase)}</div></div>
-                            <div className="flex items-center justify-between text-base mt-1">
-                                <div className="font-semibold">差引合計</div>
-                                <div className="font-bold text-lg">{yen(finalDue)}</div>
-                            </div>
+ <div className="flex items-center justify-between">
+  <div>非課税小計（法定費用）</div>
+  <div className="font-semibold">{yen(nonTaxable)}</div>
+</div>
+<div className="flex items-center justify-between">
+  <div>内消費税（{Math.round(taxRate*100)}%）</div>
+  <div className="font-semibold">{yen(internalTax)}</div>
+</div>
+<div className="flex items-center justify-between">
+  <div>税込合計</div>
+  <div className="font-semibold">{yen(grandTotal)}</div>
+</div>
+<div className="mt-4">
+  <div className="text-sm font-semibold mb-1">備考（Excelに出力）</div>
+  <textarea
+    className="w-full border rounded-lg px-3 py-2 text-sm min-h-[90px]"
+    placeholder="例：工賃は込み、オイルは持込品、納車希望日○/○ など"
+    value={meta.remarks || ""}
+    onChange={(e) => setMeta({ ...meta, remarks: e.target.value })}
+  />
+</div>
+<div className="flex items-center justify-between text-base mt-1">
+  <div className="font-semibold">差引合計（預り金差引後）</div>
+  <div className="font-bold text-lg">{yen(finalDue)}</div>
+</div>
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
