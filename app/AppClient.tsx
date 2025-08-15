@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from "react";
 // ---- 型定義（アプリ用） ----
 type ServiceDef = {
     id: string;
+    vehicleType: '2輪' | '4輪';  // 車種タイプ（2輪・4輪）
     cat: string;
     name: string;
     price: number;
@@ -26,12 +27,105 @@ type FeesDraft = { discount: string; deposit: string };
 type CustomPart = { maker: string; name: string; partNo: string; unit: number; qty: number };
 // ---- サンプル品目（税込） ----
 const SERVICES: readonly ServiceDef[] = [
-    // エンジン系統
+    // 4輪車サービス
+    { id: "4w_inspection", vehicleType: "4輪", cat: "車検（４輪）", name: "法定点検一式", price: 25000, notes: "点検および調整、法定費用含む" },
+    { id: "4w_inspection_agency", vehicleType: "4輪", cat: "車検（４輪）", name: "車検代行費用", price: 10000 },
+    
+    // 4輪エンジン系統
+    { id: "4w_engine_removal", vehicleType: "4輪", cat: "エンジン系統", name: "エンジン脱着", price: 80000 },
+    { id: "4w_engine_overhaul", vehicleType: "4輪", cat: "エンジン系統", name: "エンジンフルオーバーホール", price: 200000, notes: "別途エンジン脱着等が必要" },
+    { id: "4w_head_overhaul", vehicleType: "4輪", cat: "エンジン系統", name: "ヘッドオーバーホール", price: 120000, notes: "別途エンジン脱着等が必要" },
+    { id: "4w_valve_stem_seal", vehicleType: "4輪", cat: "エンジン系統", name: "バルブステムシール交換", price: 2000, notes: "1箇所あたり、別途エンジン脱着等が必要" },
+    { id: "4w_cam_chain", vehicleType: "4輪", cat: "エンジン系統", name: "カムチェーン交換", price: 24000, notes: "別途エンジン脱着等が必要" },
+    { id: "4w_head_cover_gasket", vehicleType: "4輪", cat: "エンジン系統", name: "ヘッドカバーパッキン交換", price: 5000, notes: "別途エンジン脱着等が必要" },
+    { id: "4w_piston", vehicleType: "4輪", cat: "エンジン系統", name: "ピストン交換", price: 18000, notes: "別途エンジン脱着等が必要" },
+    { id: "4w_crank", vehicleType: "4輪", cat: "エンジン系統", name: "クランク交換", price: 14000, notes: "別途エンジン脱着等が必要" },
+    { id: "4w_sensor", vehicleType: "4輪", cat: "エンジン系統", name: "各種センサー交換", price: 4000 },
+    { id: "4w_oil_pump", vehicleType: "4輪", cat: "エンジン系統", name: "オイルポンプ交換", price: 5000, notes: "別途オイルパン脱着等が必要" },
+    { id: "4w_water_pump", vehicleType: "4輪", cat: "エンジン系統", name: "ウォーターポンプ交換", price: 5000, notes: "別途補器類脱着等が必要" },
+    { id: "4w_spark_plug", vehicleType: "4輪", cat: "エンジン系統", name: "スパークプラグ交換", price: 1500, notes: "1本あたり" },
+    { id: "4w_direct_coil", vehicleType: "4輪", cat: "エンジン系統", name: "ダイレクトコイル交換", price: 2000, notes: "1本あたり" },
+    { id: "4w_turbin", vehicleType: "4輪", cat: "エンジン系統", name: "タービン交換", price: 14000, notes: "別途エキゾースト等脱着が必要" },
+    { id: "4w_intake_manifold", vehicleType: "4輪", cat: "エンジン系統", name: "インマニ脱着", price: 15000 },
+    { id: "4w_engine_mount", vehicleType: "4輪", cat: "エンジン系統", name: "エンジンマウント交換", price: 30000 },
+
+    // 4輪ミッション系統
+    { id: "4w_transmission_removal", vehicleType: "4輪", cat: "ミッション系統", name: "トランスミッション脱着", price: 60000, notes: "別途ミッション脱着が必要" },
+    { id: "4w_transmission_overhaul", vehicleType: "4輪", cat: "ミッション系統", name: "ミッションオーバーホール", price: 150000, notes: "別途ミッション脱着が必要" },
+    { id: "4w_mt_transmission", vehicleType: "4輪", cat: "ミッション系統", name: "MTミッション交換", price: 60000 },
+    { id: "4w_clutch", vehicleType: "4輪", cat: "ミッション系統", name: "クラッチ交換", price: 15000, notes: "別途ミッション脱着が必要" },
+    { id: "4w_front_seal", vehicleType: "4輪", cat: "ミッション系統", name: "フロントシール交換", price: 4000, notes: "別途ミッション脱着が必要" },
+    { id: "4w_rear_seal", vehicleType: "4輪", cat: "ミッション系統", name: "リアシール交換", price: 4000, notes: "別途ミッション脱着が必要" },
+    { id: "4w_mission_oil", vehicleType: "4輪", cat: "ミッション系統", name: "ミッションオイル交換", price: 2000 },
+    { id: "4w_atf", vehicleType: "4輪", cat: "ミッション系統", name: "ATF交換", price: 4000 },
+    { id: "4w_at_transmission", vehicleType: "4輪", cat: "ミッション系統", name: "ATミッション交換", price: 65000 },
+
+    // 4輪タイヤ系統
+    { id: "4w_tire_change", vehicleType: "4輪", cat: "タイヤ系統", name: "タイヤ交換", price: 1500, notes: "1本あたり" },
+    { id: "4w_tire_balance", vehicleType: "4輪", cat: "タイヤ系統", name: "バランス取り", price: 1500, notes: "1本あたり" },
+    { id: "4w_tire_rotation", vehicleType: "4輪", cat: "タイヤ系統", name: "タイヤローテーション", price: 2500 },
+    { id: "4w_puncture_repair", vehicleType: "4輪", cat: "タイヤ系統", name: "パンク修理", price: 2000, notes: "1箇所あたり" },
+    { id: "4w_tire_disposal", vehicleType: "4輪", cat: "タイヤ系統", name: "廃タイヤ処分", price: 500, notes: "1本あたり" },
+    { id: "4w_tire_mount", vehicleType: "4輪", cat: "タイヤ系統", name: "タイヤ履き替え", price: 4500 },
+
+    // 2輪車サービス
+    { id: "2w_inspection", vehicleType: "2輪", cat: "車検（２輪）", name: "法定点検一式", price: 24000, notes: "点検および調整、法定費用含む" },
+    { id: "2w_inspection_agency", vehicleType: "2輪", cat: "車検（２輪）", name: "車検代行費用", price: 10000 },
+
+    // 2輪タイヤ系統
+    { id: "2w_tire_front_cast", vehicleType: "2輪", cat: "タイヤ系統", name: "タイヤ交換 合わせホイール（フロント）", price: 5700, bringIn: 11400, notes: "ホイールバランス取れません" },
+    { id: "2w_tire_rear_cast", vehicleType: "2輪", cat: "タイヤ系統", name: "タイヤ交換 合わせホイール（リア）", price: 6800, bringIn: 13600, notes: "同時リヤスプロケット交換無料" },
+    { id: "2w_tire_front_domestic", vehicleType: "2輪", cat: "タイヤ系統", name: "タイヤ交換フロント 国産", price: 4400, bringIn: 8800, notes: "ホイールバランスサービス" },
+    { id: "2w_tire_front_import", vehicleType: "2輪", cat: "タイヤ系統", name: "タイヤ交換フロント 外車", price: 6600, bringIn: 13200, notes: "ホイールバランスサービス" },
+    { id: "2w_tire_rear_domestic", vehicleType: "2輪", cat: "タイヤ系統", name: "タイヤ交換リア 国産", price: 5500, bringIn: 11000, notes: "ホイールバランスサービス" },
+    { id: "2w_tire_rear_import", vehicleType: "2輪", cat: "タイヤ系統", name: "タイヤ交換リア 外車", price: 8200, bringIn: 16400, notes: "ホイールバランスサービス" },
+    { id: "2w_tire_puncture", vehicleType: "2輪", cat: "タイヤ系統", name: "パンク修理", price: 2500, notes: "1ヶ所" },
+    
+    // 2輪潤滑・冷却系統
+    { id: "2w_oil_change", vehicleType: "2輪", cat: "潤滑・冷却系統", name: "オイル交換", price: 1100, bringIn: 2200, notes: "パーツ脱着必要時は別途工賃" },
+    { id: "2w_oil_element", vehicleType: "2輪", cat: "潤滑・冷却系統", name: "オイル＋エレメント交換", price: 1980, bringIn: 3960, notes: "DCTフィルター+880円" },
+    { id: "2w_llc_126", vehicleType: "2輪", cat: "潤滑・冷却系統", name: "LLC交換 126cc～", price: 8600, bringIn: 17200, notes: "カウル、タンク脱着含む" },
+    { id: "2w_llc_125", vehicleType: "2輪", cat: "潤滑・冷却系統", name: "LLC交換 ～125cc", price: 5500, bringIn: 11000, notes: "カウル、タンク脱着含む" },
+    
+    // 2輪エンジン修理（4st）
+    { id: "2w_4st_engine_removal", vehicleType: "2輪", cat: "4stエンジン修理系統", name: "エンジン脱着", price: 52000, notes: "カウル脱着別途" },
+    { id: "2w_4st_engine_full_oh", vehicleType: "2輪", cat: "4stエンジン修理系統", name: "エンジンフルオーバーホール", price: 200000, notes: "シングル120,000円、別途エンジン脱着等必要" },
+    { id: "2w_4st_engine_upper_oh", vehicleType: "2輪", cat: "4stエンジン修理系統", name: "エンジン腰上オーバーホール", price: 100000, notes: "シングル60,000円、別途エンジン脱着等必要" },
+    { id: "2w_4st_head_oh", vehicleType: "2輪", cat: "4stエンジン修理系統", name: "ヘッドオーバーホール", price: 60000, notes: "シングル40,000円、別途エンジン脱着等必要" },
+
+    // 2輪エンジン修理（2st）
+    { id: "2w_2st_engine_removal", vehicleType: "2輪", cat: "2stエンジン修理系統", name: "エンジン脱着", price: 31200, notes: "レーサー等シングル8,000円、カウル脱着別途" },
+    { id: "2w_2st_engine_full_oh", vehicleType: "2輪", cat: "2stエンジン修理系統", name: "エンジンフルオーバーホール", price: 32500, notes: "レーサー等シングル24,000円、別途エンジン脱着等必要" },
+    { id: "2w_2st_engine_upper_oh", vehicleType: "2輪", cat: "2stエンジン修理系統", name: "エンジン腰上オーバーホール", price: 16900, notes: "レーサー等シングル12,000円、別途エンジン脱着等必要" },
+
+    // 2輪吸排気系統
+    { id: "2w_air_element", vehicleType: "2輪", cat: "吸排気系統", name: "エアエレメント交換", price: 2500, bringIn: 5000, notes: "カウル、タンク脱着別途" },
+    { id: "2w_carb_oh_125", vehicleType: "2輪", cat: "吸排気系統", name: "キャブレターOH ～125cc", price: 9900, notes: "タンク脱着込み、同調/CO・HC測定込み" },
+    { id: "2w_carb_oh_single", vehicleType: "2輪", cat: "吸排気系統", name: "キャブレターOH シングル", price: 14900, notes: "タンク脱着込み、同調/CO・HC測定込み" },
+    { id: "2w_carb_oh_twin", vehicleType: "2輪", cat: "吸排気系統", name: "キャブレターOH 2気筒", price: 24800, notes: "タンク脱着込み、同調/CO・HC測定込み" },
+    { id: "2w_carb_oh_multi", vehicleType: "2輪", cat: "吸排気系統", name: "キャブレターOH 3気筒以上", price: 33000, notes: "タンク脱着込み、同調/CO・HC測定込み" },
+    { id: "2w_muffler_twin", vehicleType: "2輪", cat: "吸排気系統", name: "マフラー交換 2気筒以上", price: 14900, bringIn: 29800, notes: "カウル脱着別途" },
+    { id: "2w_muffler_single", vehicleType: "2輪", cat: "吸排気系統", name: "マフラー交換 シングル・スクーター", price: 6600, bringIn: 13200, notes: "カウル脱着別途" },
+    { id: "2w_muffler_slipon", vehicleType: "2輪", cat: "吸排気系統", name: "マフラー交換 スリップオン", price: 5000, bringIn: 10000, notes: "カウル脱着別途" },
+
+    // 2輪ブレーキ系統
+    { id: "2w_brake_pad", vehicleType: "2輪", cat: "ブレーキ系統", name: "ブレーキパッド交換", price: 2640, bringIn: 5280, notes: "1キャリパー、清掃含む" },
+    { id: "2w_brake_fluid", vehicleType: "2輪", cat: "ブレーキ系統", name: "ブレーキフルード交換", price: 2900, notes: "1ライン、フルード代込み" },
+    { id: "2w_brake_hose_single", vehicleType: "2輪", cat: "ブレーキ系統", name: "ブレーキホース交換（シングル）", price: 6600, bringIn: 13200, notes: "カウル脱着別途" },
+    { id: "2w_brake_hose_double", vehicleType: "2輪", cat: "ブレーキ系統", name: "ブレーキホース交換（ダブル）", price: 9900, bringIn: 19800, notes: "カウル脱着別途" },
+    { id: "2w_caliper_single", vehicleType: "2輪", cat: "ブレーキ系統", name: "キャリパー交換（シングル）", price: 9900, bringIn: 19800, notes: "純正6,100円、ブレーキフルード代込み" },
+    { id: "2w_caliper_double", vehicleType: "2輪", cat: "ブレーキ系統", name: "キャリパー交換（ダブル）", price: 11600, bringIn: 23200, notes: "純正8,600円、ブレーキフルード代込み" },
 
     // その他作業・一般工賃
-    { id: "general_domestic", cat: "その他作業・一般工賃", name: "国産車（1時間）", price: 10000 },
-    { id: "general_import", cat: "その他作業・一般工賃", name: "輸入車（1時間）", price: 15000 },
-    { id: "general_special", cat: "その他作業・一般工賃", name: "特殊車両（1時間）", price: 20000 }
+    { id: "general_domestic", vehicleType: "2輪", cat: "その他作業", name: "国産車（1時間）", price: 10000 },
+    { id: "general_import", vehicleType: "2輪", cat: "その他作業", name: "輸入車（1時間）", price: 15000 },
+    { id: "general_special", vehicleType: "2輪", cat: "その他作業", name: "特殊車両（1時間）", price: 20000 },
+
+    // レーシングサービス
+    { id: "racing_mechanic", vehicleType: "2輪", cat: "レーシングサービス", name: "メカニック帯同（1日）", price: 33000, notes: "交通費別途、ピットクルーライセンス登録込み" },
+    { id: "racing_data", vehicleType: "2輪", cat: "レーシングサービス", name: "データロギング", price: 11000 },
+    { id: "racing_setup", vehicleType: "2輪", cat: "レーシングサービス", name: "マシンセットアップ", price: 11000 },
+    { id: "racing_full", vehicleType: "2輪", cat: "レーシングサービス", name: "上記フルパック（1日）", price: 44000 }
 ];
 
 function yen(n: number) {
@@ -83,10 +177,11 @@ function isComposingNative(ev: unknown): boolean {
 export default function AppClient() {
     //自由部品入力
     const [customParts, setCustomParts] = useState<CustomPart[]>([
-        { maker: "", name: "", partNo: "", unit: 0, qty: 1 },
+        { maker: "", name: "", partNo: "", unit: 0, qty: 0 },
     ]);
     // 検索・選択
     const [q, setQ] = useState("");
+    const [vehicleType, setVehicleType] = useState<'2輪' | '4輪' | 'ALL'>('ALL');
     const [cat, setCat] = useState("ALL");
     const [useBringIn, setUseBringIn] = useState<Record<string, boolean>>({});
     const [qtyDraft, setQtyDraft] = useState<Record<string, number | string>>({});
@@ -147,14 +242,27 @@ const [feesDraft, setFeesDraft] = useState<FeesDraft>({ discount: "", deposit: "
     // 派生
     const categories = useMemo(() => {
         const s = new Set<string>(["ALL"]);
-        (SERVICES as readonly ServiceDef[]).forEach((x) => s.add(x.cat));
+        (SERVICES as readonly ServiceDef[])
+            .filter((x) => vehicleType === "ALL" || x.vehicleType === vehicleType)
+            .forEach((x) => s.add(x.cat));
         return Array.from(s);
-    }, []);
+    }, [vehicleType]);
+    
     const filtered = useMemo<ServiceDef[]>(() => {
         const kw = q.trim().toLowerCase();
         return (SERVICES as readonly ServiceDef[])
-            .filter((s) => (cat === "ALL" || s.cat === cat) && (!kw || (s.name + s.cat).toLowerCase().includes(kw)));
-    }, [q, cat]);
+            .filter((s) => 
+                (vehicleType === "ALL" || s.vehicleType === vehicleType) &&
+                (cat === "ALL" || s.cat === cat) && 
+                (!kw || (s.name + s.cat).toLowerCase().includes(kw))
+            );
+    }, [q, vehicleType, cat]);
+    
+    // 車種タイプが変更されたときにカテゴリをリセット
+    useEffect(() => {
+        setCat("ALL");
+    }, [vehicleType]);
+    
     const itemsSubtotal = useMemo(() => items.reduce((a, b) => a + b.price * b.qty, 0), [items]);
 
     // 計算
@@ -356,7 +464,22 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             placeholder="キーワード検索"
                             className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                         />
-                        <div className="mt-3 text-sm font-semibold mb-1">カテゴリー</div>
+                        
+                        <div className="mt-3 text-sm font-semibold mb-1">車種タイプ</div>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {(['ALL', '2輪', '4輪'] as const).map((vt) => (
+                                <button
+                                    key={vt}
+                                    type="button"
+                                    onClick={() => setVehicleType(vt)}
+                                    className={`px-3 py-1.5 rounded-full border text-xs ${vehicleType === vt ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-100"}`}
+                                >
+                                    {vt === 'ALL' ? '全て' : vt}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        <div className="text-sm font-semibold mb-1">カテゴリー</div>
                         <div className="flex flex-wrap gap-2">
                             {categories.map((c) => (
                                 <button
@@ -382,9 +505,13 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             {filtered.map((s: ServiceDef) => (
                                 <div key={s.id} className="border rounded-xl p-3 hover:shadow-sm">
                                     <div className="flex items-start justify-between gap-3">
-                                        <div>
+                                        <div className="flex-1">
                                             <div className="font-medium">{s.name}</div>
-                                            <div className="text-xs text-slate-500">{s.cat}</div>
+                                            <div className="text-xs text-slate-500">
+                                                <span className="bg-slate-100 px-1.5 py-0.5 rounded mr-2">{s.vehicleType}</span>
+                                                {s.cat}
+                                            </div>
+                                            {s.notes && <div className="text-xs text-blue-600 mt-1">{s.notes}</div>}
                                         </div>
                                         <div className="text-right text-sm">
                                             <div>通常: <span className="font-semibold">{yen(s.price)}</span></div>
@@ -493,7 +620,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             <button
                                 type="button"
                                 className="px-3 py-1.5 rounded-lg border text-sm bg-white hover:bg-slate-50"
-                                onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 1 }])}
+                                onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 0 }])}
                             >＋ 行を追加</button>
                         </div>
                     </div>
