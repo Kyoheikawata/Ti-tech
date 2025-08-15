@@ -73,14 +73,56 @@ const templatePath = path.join(process.cwd(), "public", "templates", "shaken_tem
 const book = new Workbook();
 await book.xlsx.readFile(templatePath);
 
+
   // 対象シート（A1 に「見積書」を含む / 無ければ先頭）
   const ws =
     book.worksheets.find(w => String(w.getCell("A1").value ?? "").includes("見積書")) ??
     book.worksheets[0];
 
+  // 追加：ページ余白とページ設定（ExcelJS の単位は inch）
+  const cmToInch = (cm: number) => cm / 2.54;
+  
+  // ページ設定を初期化
+  ws.pageSetup = {
+    ...ws.pageSetup,
+    paperSize: 9, // A4
+    orientation: 'portrait',
+    margins: {
+      left: 0.7,
+      right: 0.7,
+      top: cmToInch(1.5), // 1.5cm
+      bottom: 0.75,
+      header: 0.3,
+      footer: 0.3
+    },
+    printArea: undefined,
+    printTitlesRow: undefined
+  };
+
+  // 1行目の高さを設定（約2.5cm相当）
+  ws.getRow(1).height = 70; // Excel のポイント単位（1ポイント = 1/72インチ）
+  
   // ★ 追加：App 側で選んだタイトルを A1 に反映
   if (data.meta?.docTitle && String(data.meta.docTitle).trim()) {
+    // 既存の結合を解除（エラー回避のため）
+    try {
+      ws.unMergeCells("A1:F1");
+    } catch (e) {
+      // 結合されていない場合は無視
+    }
+    
+    // タイトルを設定
     ws.getCell("A1").value = data.meta.docTitle;
+    // タイトルを下寄せ・中央配置
+    ws.getCell("A1").alignment = { vertical: "bottom", horizontal: "center" };
+    
+    // A1からF1までを結合して中央に配置
+    try {
+      ws.mergeCells("A1:F1");
+    } catch (e) {
+      console.warn("Merge cells warning:", e);
+      // 結合に失敗した場合でも、A1の中央配置は維持される
+    }
   }
 
   // 2) 上部：宛名・日付・車両
@@ -176,10 +218,28 @@ for (let i = 0; i < used; i++) {
   }
   for (let r = START + used; r <= END; r++) ws.getRow(r).hidden = true;
 
-// 備考を A37 セルに直接書き込む
-ws.getCell("B37").value = data.meta?.remarks ?? "";
+// 備考を B37 セルに直接書き込む
+const remarksText = data.meta?.remarks ?? "";
+ws.getCell("B37").value = remarksText;
 ws.getCell("B37").alignment = { wrapText: true, vertical: "top" };
 
+// 備考の文字数に基づいて行の高さを調整
+if (remarksText) {
+  // 1行あたり約40文字として計算（B列からF列までの幅を考慮）
+  const estimatedLines = Math.ceil(remarksText.length / 40);
+  const minHeight = 15; // 最小高さ
+  const heightPerLine = 15; // 1行あたりの高さ
+  const calculatedHeight = Math.max(minHeight, estimatedLines * heightPerLine);
+  
+  // 37行目の高さを設定
+  ws.getRow(37).height = calculatedHeight;
+  
+  // 備考が長い場合（3行以上）、ロゴと住所の位置を調整
+  const logoOffset = estimatedLines > 3 ? Math.floor((estimatedLines - 3) * 1) : 0;
+} else {
+  // 備考がない場合はデフォルトの高さ
+  ws.getRow(37).height = 15;
+}
 
   // 6) 調整値引き/預り金 … 該当ラベル行の F 列へ
   const writeAmountF = (labels: (string|RegExp)[], val: number) => {
@@ -192,6 +252,10 @@ ws.getCell("B37").alignment = { wrapText: true, vertical: "top" };
   writeAmountF(["調整値引き"], toNum(data.fees.discount));
   writeAmountF(["預り金"],     toNum(data.fees.deposit));
 
+  // 備考の行数を計算してロゴ位置を決定
+  const remarksLines = remarksText ? Math.ceil(remarksText.length / 40) : 1;
+  const logoStartRow = 40 + Math.max(0, remarksLines - 3); // 3行を超えた分だけ下にずらす
+  const logoEndRow = logoStartRow + 5;
 
   // 8) 既存のロゴ画像を削除 → 改めてセル範囲アンカーで追加
   const getImages = (ws as unknown as { getImages?: () => Array<{ imageId: number }> }).getImages;
@@ -204,8 +268,8 @@ ws.getCell("B37").alignment = { wrapText: true, vertical: "top" };
     const logoPath = path.join(process.cwd(), "public", "logo.png");
     const logoBuf = await readFile(logoPath);
     const imgId = book.addImage({ base64: "data:image/png;base64," + logoBuf.toString("base64"), extension: "png" });
-    // ★ テンプレと同じ位置に
-    ws.addImage(imgId, "A44:A49");
+    // 備考の長さに応じてロゴ位置を動的に調整
+    ws.addImage(imgId, `A${logoStartRow}:A${logoEndRow}`);
   } catch (e) {
     console.warn("logo insert skipped:", e);
   }

@@ -57,6 +57,23 @@ const toIntSafe = (raw: string) => {
     const cleaned = half.replace(/[^\d]/g, "");
     return cleaned ? Number(cleaned) : 0;
 };
+const toDecimalSafe = (raw: string, decimalPlaces: number = 1) => {
+    if (typeof raw !== "string") return 0;
+    // 全角数字を半角に変換
+    const half = raw.replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+                    .replace(/．/g, '.'); // 全角ピリオドも半角に
+    // 数字と小数点以外を削除
+    const cleaned = half.replace(/[^\d.]/g, "");
+    // 複数の小数点がある場合は最初の1つだけ残す
+    const parts = cleaned.split('.');
+    const formatted = parts.length > 1 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+    
+    const num = Number(formatted);
+    if (!Number.isFinite(num)) return 0;
+    
+    // 小数点以下の桁数を制限
+    return Math.round(num * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
+};
 const asInput = (n: number) => (Number.isFinite(n) ? String(n) : "");
 
 function isComposingNative(ev: unknown): boolean {
@@ -426,37 +443,37 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                         onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, partNo: e.target.value } : x))}
                                     />
 
-                                    {/* 金額(円)：NaN回避 & 全角/記号対策 */}
+                                    {/* 金額(円)：小数点1位まで対応 */}
                                     <input
                                         className="col-span-6 sm:col-span-2 border rounded px-2 py-1 text-right text-sm"
-                                        inputMode="numeric"
+                                        inputMode="decimal"
                                         placeholder="0"
                                         value={asInput(p.unit)}
                                         onChange={(e) => {
                                             if (isComposingNative(e.nativeEvent)) return; // 合成中は無視
-                                            const n = toIntSafe((e.target as HTMLInputElement).value);
+                                            const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
                                             setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x)); // ★unit を更新
                                         }}
                                         onCompositionEnd={(e) => {
-                                            const n = toIntSafe((e.target as HTMLInputElement).value);
+                                            const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
                                             setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x)); // ★unit を確定
                                         }}
                                     />
 
 
-                                    {/* 個数：同様に安全化、0以上 */}
+                                    {/* 個数：小数点1位まで対応 */}
                                     <input
                                         className="col-span-6 sm:col-span-1 border rounded px-2 py-1 text-right text-sm"
-                                        inputMode="numeric"
+                                        inputMode="decimal"
                                         placeholder="1"
                                         value={asInput(p.qty)}
                                         onChange={(e) => {
                                             if (isComposingNative(e.nativeEvent)) return;
-                                            const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
+                                            const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
                                             setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x)); // ★qty を更新
                                         }}
                                         onCompositionEnd={(e) => {
-                                            const n = Math.max(0, toIntSafe((e.target as HTMLInputElement).value));
+                                            const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
                                             setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x)); // ★qty を確定
                                         }}
                                     />
