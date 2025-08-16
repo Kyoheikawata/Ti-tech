@@ -357,3 +357,114 @@ const payload = { client, vehicle, items, legal, fees, settings, meta, customPar
 - テンプレートのパスは `public/templates/shaken_template.xlsx`（名称・配置を変更しないこと）。
 - 既存のロゴ画像がある場合は `route.ts` で再配置しているため、画像差し替え時は `public/logo.png` を置換。
 - ブラウザのローカルストレージに保存された旧設定が残っていると UI 表示に差異が出る場合あり。必要に応じてクリア。
+
+---
+
+## 2025年8月16日の追加改修
+
+### 小数点入力対応
+
+**問題**: スマートフォンで小数点キーボードが表示されるが、実際に小数点を入力できない
+
+**修正内容**:
+- 手入力部品の金額・個数入力で小数点入力を可能に
+- 法定費用、調整値引き、預り金でも小数点入力に対応
+- 品目追加・編集時の個数入力で小数点対応（最小値0.1、ステップ0.1）
+- `inputMode="numeric"` → `inputMode="decimal"` に変更
+- 入力中は文字列として保持し、フォーカスアウト時に数値変換する方式を採用
+
+```typescript
+// 手入力部品の型定義を拡張
+type CustomPart = { 
+  maker: string; 
+  name: string; 
+  partNo: string; 
+  unit: number; 
+  qty: number; 
+  unitDraft?: string;  // 入力中の文字列を保持
+  qtyDraft?: string;   // 入力中の文字列を保持
+};
+```
+
+### Excel出力の表示改善
+
+**修正内容**:
+1. **個数の小数点表示対応**
+   - 新しい数値フォーマット `qtyFmt = '0.#;-0.#;0'` を定義
+   - 小数点があれば表示、なければ整数表示（例: 11.2 → "11.2"、11.0 → "11"）
+
+2. **法定費用セルの表示改善**
+   - セル幅の自動調整（D列・F列: 12文字、E列: 8文字）
+   - セル内配置の改善（金額は右寄せ、個数は中央寄せ、縦中央配置）
+   - 大きな金額（10,000円など）でもセルからはみ出ない
+
+3. **計算ロジックの修正**
+   - 合計①+②の計算を正確に実行
+   - Excel出力時にサーバーサイドで正しい計算値を直接設定
+   - デバッグログを追加して計算過程を可視化
+
+4. **表示ラベルの改善**
+   - 「小計」→「小計（税込）②」に変更
+   - 走行距離の数字を中央揃いに設定
+   - 名前の位置を既存の「様」セルに設定し、既存の書式を保持
+
+### ホームページアイコン設定
+
+**修正内容**:
+- `app/layout.tsx`でfaviconの設定を追加
+- `/logo.png`をicon、shortcut、apple-touch-iconとして設定
+- ページタイトルを「Ti-Tech見積書・請求書ビルダー」に変更
+
+```typescript
+export const metadata: Metadata = {
+  title: "Ti-Tech見積書・請求書ビルダー",
+  description: "Ti-Tech見積書・請求書ビルダー",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
+};
+```
+
+### 技術的詳細
+
+#### 小数点処理関数
+```typescript
+const toDecimalSafe = (raw: string, decimalPlaces: number = 1) => {
+  if (typeof raw !== "string") return 0;
+  // 全角数字を半角に変換
+  const half = raw.replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+                  .replace(/．/g, '.'); // 全角ピリオドも半角に
+  // 数字と小数点以外を削除
+  const cleaned = half.replace(/[^\d.]/g, "");
+  // 複数の小数点がある場合は最初の1つだけ残す
+  const parts = cleaned.split('.');
+  const formatted = parts.length > 1 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+  
+  const num = Number(formatted);
+  if (!Number.isFinite(num)) return 0;
+  
+  // 小数点以下の桁数を制限
+  return Math.round(num * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
+};
+```
+
+#### Excel数値フォーマット定義
+```typescript
+const moneyFmt = '"¥"#,##0;-"¥"#,##0';     // 金額表示
+const qtyFmt = '0.#;-0.#;0';               // 個数表示（小数点対応）
+```
+
+### 修正対象ファイル
+- `app/AppClient.tsx`: UI改善、小数点入力対応
+- `app/layout.tsx`: favicon設定
+- `app/api/export/route.ts`: Excel出力改善、計算修正、表示調整
+
+### 動作確認ポイント
+1. スマートフォンで小数点キーボードが表示され、実際に小数点入力ができること
+2. 手入力部品でフォーカスアウト後も入力値が保持されること
+3. Excel出力で個数の小数点が正しく表示されること（11.2 → "11.2"）
+4. 法定費用で大きな金額でもセルからはみ出ないこと
+5. 合計①+②の計算が正確であること（例: ①12,000 + ②10,000 = 22,000）
+6. ブラウザタブにlogo.pngのアイコンが表示されること

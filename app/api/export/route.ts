@@ -36,7 +36,7 @@ type CustomPart = { maker?: string; name: string; partNo?: string; unit: number;
 
 // 共通
 const moneyFmt = '"¥"#,##0;-"¥"#,##0';
-const qtyFmt = '0.#;-0.#;0'; // 小数点があれば表示、なければ整数表示
+const qtyFmt = '0.###;-0.###;0'; // 整数は小数点なし、小数は最大3桁まで表示
 const toNum = (v: unknown) => (typeof v === "number" ? v : Number(v || 0));
 const norm = (s: string) => String(s).replace(/\s+/g, "");
 
