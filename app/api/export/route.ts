@@ -36,7 +36,7 @@ type CustomPart = { maker?: string; name: string; partNo?: string; unit: number;
 
 // 共通
 const moneyFmt = '"¥"#,##0;-"¥"#,##0';
-const qtyFmt = '0.###;-0.###;0'; // 整数は小数点なし、小数は最大3桁まで表示
+const qtyFmt = '0.0##;-0.0##;0'; // 小数点がある場合は表示、整数は小数点なし
 const toNum = (v: unknown) => (typeof v === "number" ? v : Number(v || 0));
 const norm = (s: string) => String(s).replace(/\s+/g, "");
 
@@ -178,7 +178,9 @@ await book.xlsx.readFile(templatePath);
   const L9        = jbUnit;  // 自賠責は金額そのもの（qtyは掛けない）
 
   const d9 = ws.getCell("D9"); d9.value = jbUnit; d9.numFmt = moneyFmt; d9.alignment = { horizontal: "right", vertical: "middle" };
-  const e9 = ws.getCell("E9"); e9.value = jbQtyXls; e9.numFmt = qtyFmt; e9.alignment = { horizontal: "center", vertical: "middle" };
+  const e9 = ws.getCell("E9"); 
+  e9.value = jbQtyXls.toString(); // 文字列として設定して四捨五入防止
+  e9.alignment = { horizontal: "center", vertical: "middle" };
   const f9 = ws.getCell("F9"); f9.value = L9; f9.numFmt = moneyFmt; f9.alignment = { horizontal: "right", vertical: "middle" };
 
   // ラベルを「自賠責保険◯ヶ月」に書き換え（テンプレ内の既存ラベルを検索）
@@ -192,11 +194,17 @@ await book.xlsx.readFile(templatePath);
   const L11 = toNum(data.legal.stamp.unit)     * toNum(data.legal.stamp.qty);
 
   const d10 = ws.getCell("D10"); d10.value = toNum(data.legal.weightTax.unit); d10.numFmt = moneyFmt; d10.alignment = { horizontal: "right", vertical: "middle" };
-  const e10 = ws.getCell("E10"); e10.value = toNum(data.legal.weightTax.qty); e10.numFmt = qtyFmt; e10.alignment = { horizontal: "center", vertical: "middle" };
+  const e10 = ws.getCell("E10"); 
+  const weightTaxQty = toNum(data.legal.weightTax.qty);
+  e10.value = weightTaxQty.toString(); // 文字列として設定して四捨五入防止
+  e10.alignment = { horizontal: "center", vertical: "middle" };
   const f10 = ws.getCell("F10"); f10.value = L10; f10.numFmt = moneyFmt; f10.alignment = { horizontal: "right", vertical: "middle" };
 
   const d11 = ws.getCell("D11"); d11.value = toNum(data.legal.stamp.unit); d11.numFmt = moneyFmt; d11.alignment = { horizontal: "right", vertical: "middle" };
-  const e11 = ws.getCell("E11"); e11.value = toNum(data.legal.stamp.qty); e11.numFmt = qtyFmt; e11.alignment = { horizontal: "center", vertical: "middle" };
+  const e11 = ws.getCell("E11"); 
+  const stampQty = toNum(data.legal.stamp.qty);
+  e11.value = stampQty.toString(); // 文字列として設定して四捨五入防止
+  e11.alignment = { horizontal: "center", vertical: "middle" };
   const f11 = ws.getCell("F11"); f11.value = L11; f11.numFmt = moneyFmt; f11.alignment = { horizontal: "right", vertical: "middle" };
 
   // 法定費用のセル幅を自動調整（D、E、F列）
@@ -229,9 +237,28 @@ const allItems: ItemEx[] = [...data.items, ...partsAsItems];
 
 
 
-  // 4) 明細（A15:F36）
+  // 4) 明細（A15:F36）- 22行固定でレイアウト保護
   const START = 15, TEMPLATE_ROWS = 22, END = START + TEMPLATE_ROWS - 1;
   const used = Math.min(allItems.length, TEMPLATE_ROWS);
+  
+  // 22行を超える場合の警告表示
+  if (allItems.length > TEMPLATE_ROWS) {
+    const cutItems = allItems.length - TEMPLATE_ROWS;
+    console.warn(`警告: 明細が${allItems.length}行ありますが、テンプレートは${TEMPLATE_ROWS}行までです。${cutItems}行がカットされます。`);
+    
+    // Excel内に警告メッセージを表示（備考欄の下）
+    const warningText = `⚠️ 注意: 明細が${allItems.length}行ありましたが、表示できるのは${TEMPLATE_ROWS}行までです。${cutItems}行の明細が省略されています。`;
+    const warningRow = 38; // 備考の下の行
+    ws.getCell(`A${warningRow}`).value = warningText;
+    ws.getCell(`A${warningRow}`).font = { color: { argb: 'FFFF0000' }, bold: true }; // 赤字・太字
+    ws.getCell(`A${warningRow}`).alignment = { wrapText: true, vertical: "top" };
+    // A38からF38まで結合
+    try {
+      ws.mergeCells(`A${warningRow}:F${warningRow}`);
+    } catch (e) {
+      console.warn("Warning merge cells failed:", e);
+    }
+  }
 
 for (let r = START; r <= END; r++) {
   ws.getRow(r).hidden = false;
@@ -252,7 +279,17 @@ for (let i = 0; i < used; i++) {
   ws.getCell(`C${r}`).value = (it as ItemEx).partNo ?? "";
 
   ws.getCell(`D${r}`).value = unit; ws.getCell(`D${r}`).numFmt = moneyFmt;
-  ws.getCell(`E${r}`).value = qty;  ws.getCell(`E${r}`).numFmt = qtyFmt;
+  
+  // 個数を文字列として設定して四捨五入を防止
+  const eCell = ws.getCell(`E${r}`);
+  if (qty % 1 === 0) {
+    // 整数の場合は小数点なしで文字列として設定
+    eCell.value = qty.toString();
+  } else {
+    // 小数の場合は元の値をそのまま文字列として設定
+    eCell.value = qty.toString();
+  }
+  eCell.alignment = { horizontal: "center", vertical: "middle" }; // 中央揃え
   // F列はテンプレートの共有数式に任せる（触らない）
 
 
@@ -332,7 +369,7 @@ if (remarksText) {
 
   // 備考の行数を計算してロゴ位置を決定
   const remarksLines = remarksText ? Math.ceil(remarksText.length / 40) : 1;
-  const logoStartRow = 40 + Math.max(0, remarksLines - 3); // 3行を超えた分だけ下にずらす
+  const logoStartRow = 40 + Math.max(0, remarksLines - 3); // 元の位置に戻す
   const logoEndRow = logoStartRow + 5;
 
   // 8) 既存のロゴ画像を削除 → 改めてセル範囲アンカーで追加
