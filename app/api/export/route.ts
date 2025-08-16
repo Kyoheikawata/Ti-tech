@@ -77,14 +77,16 @@ export async function POST(req: Request) {
   
   const itemsTotal = data.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const customTotal = (data.customParts ?? []).reduce((sum, part) => sum + (toNum(part.unit) * toNum(part.qty)), 0);
-  const taxableBeforeDiscount = itemsTotal + customTotal;
+  const taxableBeforeDiscount = itemsTotal + customTotal;  // ②は値引き前の金額
   const discount = toNum(data.fees.discount);
   const taxableAfterDiscount = Math.max(0, taxableBeforeDiscount - discount);
   
   console.log("=== 計算デバッグ ===");
   console.log("①法定費用合計:", legalTotal, "(自賠責:", jbAmount, "+ 重量税:", weightTaxTotal, "+ 印紙:", stampTotal, ")");
-  console.log("②課税対象:", taxableAfterDiscount, "(品目:", itemsTotal, "+ 手入力:", customTotal, "- 値引き:", discount, ")");
-  console.log("合計①+②:", legalTotal + taxableAfterDiscount);
+  console.log("②課税対象（値引き前）:", taxableBeforeDiscount, "(品目:", itemsTotal, "+ 手入力:", customTotal, ")");
+  console.log("値引き額:", discount);
+  console.log("②課税対象（値引き後）:", taxableAfterDiscount);
+  console.log("合計①+②（値引き前）:", legalTotal + taxableBeforeDiscount);
 
   // 1) テンプレを exceljs で読込
 const templatePath = path.join(process.cwd(), "public", "templates", "shaken_template.xlsx");
@@ -298,17 +300,35 @@ if (remarksText) {
     ws.getCell(subtotalLabel.row, subtotalLabel.col).value = "小計（税込）②";
   }
   
-  // 合計①+②の計算を修正
-  const grandTotalCorrect = legalTotal + taxableAfterDiscount;
-  console.log("正しい合計①+②:", grandTotalCorrect);
+  // 合計①+②の計算を修正（値引き前の②を使用）
+  const grandTotalCorrect = legalTotal + taxableBeforeDiscount;
+  console.log("正しい合計①+②（値引き前）:", grandTotalCorrect);
+  
+  // より詳細なデバッグ情報を出力
+  console.log("=== 詳細デバッグ ===");
+  console.log("自賠責単体:", jbAmount);
+  console.log("重量税計算:", data.legal.weightTax.unit, "×", data.legal.weightTax.qty, "=", weightTaxTotal);
+  console.log("印紙代計算:", data.legal.stamp.unit, "×", data.legal.stamp.qty, "=", stampTotal);
+  console.log("品目合計:", itemsTotal);
+  console.log("手入力部品合計:", customTotal);
+  console.log("値引き額:", discount);
   
   // 「合計」または「税込合計」ラベルを探して正しい値を設定
   const grandTotalLabel = findLabelCell(ws, ["合計", "税込合計"], { searchFromBottom: true });
   if (grandTotalLabel) {
     const grandTotalCell = ws.getCell(grandTotalLabel.row, 6); // F列
+    
+    // 既存の数式があるかチェック
+    const existingFormula = grandTotalCell.formula;
+    console.log(`合計セル(${grandTotalLabel.row},6)の既存数式:`, existingFormula);
+    
+    // 数式をクリアしてから値を設定
+    grandTotalCell.formula = undefined;
     grandTotalCell.value = grandTotalCorrect;
     grandTotalCell.numFmt = moneyFmt;
-    console.log(`合計セル ${grandTotalLabel.row},6 に ${grandTotalCorrect} を設定`);
+    console.log(`合計セル ${grandTotalLabel.row},6 に ${grandTotalCorrect} を設定（数式クリア済み）`);
+  } else {
+    console.log("警告: 合計ラベルが見つかりませんでした");
   }
 
   // 備考の行数を計算してロゴ位置を決定
