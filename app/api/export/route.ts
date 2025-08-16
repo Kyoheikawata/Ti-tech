@@ -36,6 +36,7 @@ type CustomPart = { maker?: string; name: string; partNo?: string; unit: number;
 
 // 共通
 const moneyFmt = '"¥"#,##0;-"¥"#,##0';
+const qtyFmt = '0.#;-0.#;0'; // 小数点があれば表示、なければ整数表示
 const toNum = (v: unknown) => (typeof v === "number" ? v : Number(v || 0));
 const norm = (s: string) => String(s).replace(/\s+/g, "");
 
@@ -175,7 +176,7 @@ await book.xlsx.readFile(templatePath);
   const L9        = jbUnit;  // 自賠責は金額そのもの（qtyは掛けない）
 
   ws.getCell("D9").value = jbUnit;   ws.getCell("D9").numFmt = moneyFmt; // 単価=金額
-  ws.getCell("E9").value = jbQtyXls; ws.getCell("E9").numFmt = "0";      // 個数=1(0円なら0)
+  ws.getCell("E9").value = jbQtyXls; ws.getCell("E9").numFmt = qtyFmt;   // 個数=1(0円なら0)
   ws.getCell("F9").value = L9;       ws.getCell("F9").numFmt = moneyFmt;
 
   // ラベルを「自賠責保険◯ヶ月」に書き換え（テンプレ内の既存ラベルを検索）
@@ -189,11 +190,11 @@ await book.xlsx.readFile(templatePath);
   const L11 = toNum(data.legal.stamp.unit)     * toNum(data.legal.stamp.qty);
 
   ws.getCell("D10").value = toNum(data.legal.weightTax.unit); ws.getCell("D10").numFmt = moneyFmt;
-  ws.getCell("E10").value = toNum(data.legal.weightTax.qty);  ws.getCell("E10").numFmt = "0";
+  ws.getCell("E10").value = toNum(data.legal.weightTax.qty);  ws.getCell("E10").numFmt = qtyFmt;
   ws.getCell("F10").value = L10;                              ws.getCell("F10").numFmt = moneyFmt;
 
   ws.getCell("D11").value = toNum(data.legal.stamp.unit); ws.getCell("D11").numFmt = moneyFmt;
-  ws.getCell("E11").value = toNum(data.legal.stamp.qty);  ws.getCell("E11").numFmt = "0";
+  ws.getCell("E11").value = toNum(data.legal.stamp.qty);  ws.getCell("E11").numFmt = qtyFmt;
   ws.getCell("F11").value = L11;                          ws.getCell("F11").numFmt = moneyFmt;
     // ★ 追加：手入力部品を items 形式へ変換して結合
 // ★ 置換：name に (メーカー)(P/N...) を混ぜず、列で分ける
@@ -239,7 +240,7 @@ for (let i = 0; i < used; i++) {
   ws.getCell(`C${r}`).value = (it as ItemEx).partNo ?? "";
 
   ws.getCell(`D${r}`).value = unit; ws.getCell(`D${r}`).numFmt = moneyFmt;
-  ws.getCell(`E${r}`).value = qty;  ws.getCell(`E${r}`).numFmt = "0";
+  ws.getCell(`E${r}`).value = qty;  ws.getCell(`E${r}`).numFmt = qtyFmt;
   // F列はテンプレートの共有数式に任せる（触らない）
 
 
