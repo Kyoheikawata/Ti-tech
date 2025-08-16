@@ -67,6 +67,23 @@ function findLabelCell(
 
 export async function POST(req: Request) {
   const data: ExportPayload = await req.json();
+  
+  // デバッグ用：計算値をログ出力
+  const jbAmount = toNum(data.legal.jibaiseki24m.unit);
+  const weightTaxTotal = toNum(data.legal.weightTax.unit) * toNum(data.legal.weightTax.qty);
+  const stampTotal = toNum(data.legal.stamp.unit) * toNum(data.legal.stamp.qty);
+  const legalTotal = jbAmount + weightTaxTotal + stampTotal;
+  
+  const itemsTotal = data.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const customTotal = (data.customParts ?? []).reduce((sum, part) => sum + (toNum(part.unit) * toNum(part.qty)), 0);
+  const taxableBeforeDiscount = itemsTotal + customTotal;
+  const discount = toNum(data.fees.discount);
+  const taxableAfterDiscount = Math.max(0, taxableBeforeDiscount - discount);
+  
+  console.log("=== 計算デバッグ ===");
+  console.log("①法定費用合計:", legalTotal, "(自賠責:", jbAmount, "+ 重量税:", weightTaxTotal, "+ 印紙:", stampTotal, ")");
+  console.log("②課税対象:", taxableAfterDiscount, "(品目:", itemsTotal, "+ 手入力:", customTotal, "- 値引き:", discount, ")");
+  console.log("合計①+②:", legalTotal + taxableAfterDiscount);
 
   // 1) テンプレを exceljs で読込
 const templatePath = path.join(process.cwd(), "public", "templates", "shaken_template.xlsx");
@@ -126,14 +143,26 @@ await book.xlsx.readFile(templatePath);
   }
 
   // 2) 上部：宛名・日付・車両
-  ws.getCell("A2").value = data.client.name || "";
+  // 既存の「様」セルを探して名前を設定
+  const clientName = data.client.name || "";
+  const samaCell = findLabelCell(ws, ["様"], { rowMin: 1, rowMax: 5 });
+  if (samaCell && clientName) {
+    // 「様」の前に名前を設定（既存の書式を保持）
+    ws.getCell(samaCell.row, samaCell.col).value = `${clientName} 様`;
+  } else if (clientName) {
+    // フォールバック：A2セルに設定
+    ws.getCell("A2").value = clientName;
+  }
   const d = data.meta.date ? new Date(data.meta.date) : new Date();
   ws.getCell("F2").value = d; ws.getCell("F2").numFmt = "yyyy/m/d";
   ws.getCell("B3").value = data.vehicle.registrationNo || "";
   ws.getCell("D3").value = data.vehicle.modelCode || "";
   ws.getCell("B4").value = data.vehicle.model || "";
   ws.getCell("D4").value = data.vehicle.vin || "";
-  ws.getCell("B5").value = data.vehicle.mileage ? `${data.vehicle.mileage} km` : "　km";
+  // 走行距離を中央そろいに設定
+  const mileageCell = ws.getCell("B5");
+  mileageCell.value = data.vehicle.mileage ? `${data.vehicle.mileage} km` : "　km";
+  mileageCell.alignment = { horizontal: "center" };
   ws.getCell("D5").value = data.vehicle.engineModel || "";
   ws.getCell("B6").value = data.vehicle.firstReg || "";
   ws.getCell("D6").value = data.vehicle.nextInspection || "";
@@ -143,7 +172,7 @@ await book.xlsx.readFile(templatePath);
   const jbUnit    = toNum(data.legal.jibaiseki24m.unit); // 金額
   const jbMonths  = toNum(data.legal.jibaiseki24m.qty);  // 月数（表示用）
   const jbQtyXls  = jbUnit > 0 ? 1 : 0;                  // Excel上の個数
-  const L9        = jbUnit * jbQtyXls;
+  const L9        = jbUnit;  // 自賠責は金額そのもの（qtyは掛けない）
 
   ws.getCell("D9").value = jbUnit;   ws.getCell("D9").numFmt = moneyFmt; // 単価=金額
   ws.getCell("E9").value = jbQtyXls; ws.getCell("E9").numFmt = "0";      // 個数=1(0円なら0)
@@ -251,6 +280,25 @@ if (remarksText) {
   };
   writeAmountF(["調整値引き"], toNum(data.fees.discount));
   writeAmountF(["預り金"],     toNum(data.fees.deposit));
+  
+  // 「小計」を「小計②」に変更
+  const subtotalLabel = findLabelCell(ws, ["小計"], { searchFromBottom: true });
+  if (subtotalLabel) {
+    ws.getCell(subtotalLabel.row, subtotalLabel.col).value = "小計②";
+  }
+  
+  // 合計①+②の計算を修正
+  const grandTotalCorrect = legalTotal + taxableAfterDiscount;
+  console.log("正しい合計①+②:", grandTotalCorrect);
+  
+  // 「合計」または「税込合計」ラベルを探して正しい値を設定
+  const grandTotalLabel = findLabelCell(ws, ["合計", "税込合計"], { searchFromBottom: true });
+  if (grandTotalLabel) {
+    const grandTotalCell = ws.getCell(grandTotalLabel.row, 6); // F列
+    grandTotalCell.value = grandTotalCorrect;
+    grandTotalCell.numFmt = moneyFmt;
+    console.log(`合計セル ${grandTotalLabel.row},6 に ${grandTotalCorrect} を設定`);
+  }
 
   // 備考の行数を計算してロゴ位置を決定
   const remarksLines = remarksText ? Math.ceil(remarksText.length / 40) : 1;
