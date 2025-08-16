@@ -559,6 +559,9 @@ export default function AppClient() {
     });
     const [showSettings, setShowSettings] = useState(false);
     const [customerOpen, setCustomerOpen] = useState(true);
+    const [legalOpen, setLegalOpen] = useState(true);
+    const [customPartsOpen, setCustomPartsOpen] = useState(true);
+    const [itemListOpen, setItemListOpen] = useState(true);
     // --- 法定費用（非課税）：単価・個数（初期qty=0） ---
     const [legal, setLegal] = useState<Legal>({
         jibaiseki24m: { unit: 0, qty: 0 },
@@ -757,8 +760,25 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             </div>
 
                             {/* 法定費用（非課税） 単価/個数 */}
-                            <div className="text-sm font-semibold mt-4 mb-2">法定費用（非課税）</div>
-                            <div className="grid gap-2 text-sm">
+                            <div className="flex items-center justify-between mt-4 mb-2">
+                                <div className="text-sm font-semibold">法定費用（非課税）</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setLegalOpen((o) => !o)}
+                                    className="md:hidden inline-flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-slate-50"
+                                    aria-expanded={legalOpen}
+                                    aria-controls="legal-panel"
+                                >
+                                    {legalOpen ? "閉じる" : "開く"}
+                                    <svg
+                                        className={`w-3 h-3 transition-transform ${legalOpen ? "rotate-180" : "rotate-0"}`}
+                                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                                    >
+                                        <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.08 1.04l-4.25 4.25a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="legal-panel" className={`${legalOpen ? "block" : "hidden"} md:block grid gap-2 text-sm`}>
                                 {([
                                     { key: "jibaiseki24m", label: "自賠責保険" },
                                     { key: "weightTax", label: "重量税" },
@@ -846,7 +866,25 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                 {/* 中央：品目追加 */}
                 <section className="md:col-span-5">
                     <div className="bg-white rounded-2xl shadow-sm border p-3">
-                        <div className="text-sm font-semibold mb-2">品目一覧（{filtered.length}件）</div>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-sm font-semibold">品目一覧（{filtered.length}件）</div>
+                            <button
+                                type="button"
+                                onClick={() => setItemListOpen((o) => !o)}
+                                className="md:hidden inline-flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-slate-50"
+                                aria-expanded={itemListOpen}
+                                aria-controls="item-list-panel"
+                            >
+                                {itemListOpen ? "閉じる" : "開く"}
+                                <svg
+                                    className={`w-3 h-3 transition-transform ${itemListOpen ? "rotate-180" : "rotate-0"}`}
+                                    viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                                >
+                                    <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.08 1.04l-4.25 4.25a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="item-list-panel" className={`${itemListOpen ? "block" : "hidden"} md:block`}>
                         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="品目検索" className="w-full rounded-xl border px-3 py-2 text-sm mb-3" />
                         <div className="grid gap-3">
                             {filtered.map((s: ServiceDef) => (
@@ -880,10 +918,29 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                 </div>
                             ))}
                         </div>
+                        </div>
                     </div>
                     {/* === 手入力部品 === */}
                     <div className="bg-white rounded-2xl shadow-sm border p-3 mt-4">
-                        <div className="text-sm font-semibold mb-2">手入力部品</div>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-sm font-semibold">手入力部品</div>
+                            <button
+                                type="button"
+                                onClick={() => setCustomPartsOpen((o) => !o)}
+                                className="md:hidden inline-flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-slate-50"
+                                aria-expanded={customPartsOpen}
+                                aria-controls="custom-parts-panel"
+                            >
+                                {customPartsOpen ? "閉じる" : "開く"}
+                                <svg
+                                    className={`w-3 h-3 transition-transform ${customPartsOpen ? "rotate-180" : "rotate-0"}`}
+                                    viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                                >
+                                    <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.08 1.04l-4.25 4.25a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="custom-parts-panel" className={`${customPartsOpen ? "block" : "hidden"} md:block`}>
 
                         {/* 列見出しでガイドを明確化 - デスクトップのみ表示 */}
                         <div className="hidden sm:grid grid-cols-12 gap-2 text-[11px] text-slate-500 mb-1 px-1">
@@ -1041,6 +1098,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                 onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 0 }])}
                             >＋ 行を追加</button>
                         </div>
+                        </div>
                     </div>
 
                 </section>
@@ -1129,7 +1187,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
   <div className="font-semibold">{yen(grandTotal)}</div>
 </div>
 <div className="mt-4">
-  <div className="text-sm font-semibold mb-1">備考（Excelに出力）</div>
+  <div className="text-sm font-semibold mb-1">備考</div>
   <textarea
     className="w-full border rounded-lg px-3 py-2 text-sm min-h-[90px]"
     placeholder="例：工賃は込み、オイルは持込品、納車希望日○/○ など"
