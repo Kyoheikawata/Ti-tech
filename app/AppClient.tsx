@@ -24,7 +24,7 @@ type LegalDraft = Record<LegalKey, QtyUnitDraft>;
 
 type Fees = { discount: number; deposit: number };
 type FeesDraft = { discount: string; deposit: string };
-type CustomPart = { maker: string; name: string; partNo: string; unit: number; qty: number };
+type CustomPart = { maker: string; name: string; partNo: string; unit: number; qty: number; unitDraft?: string; qtyDraft?: string };
 // ---- サンプル品目（税込） ----
 const SERVICES: readonly ServiceDef[] = [
     // 4輪車サービス
@@ -177,7 +177,7 @@ function isComposingNative(ev: unknown): boolean {
 export default function AppClient() {
     //自由部品入力
     const [customParts, setCustomParts] = useState<CustomPart[]>([
-        { maker: "", name: "", partNo: "", unit: 0, qty: 0 },
+        { maker: "", name: "", partNo: "", unit: 0, qty: 0, unitDraft: "", qtyDraft: "" },
     ]);
     // 検索・選択
     const [q, setQ] = useState("");
@@ -587,15 +587,14 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                                     className="w-full border rounded px-2 py-1 text-right text-sm"
                                                     inputMode="decimal"
                                                     placeholder="例: 1500"
-                                                    value={p.unit || ""}
+                                                    value={p.unitDraft ?? (p.unit ? String(p.unit) : "")}
                                                     onChange={(e) => {
                                                         if (isComposingNative(e.nativeEvent)) return;
-                                                        const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
-                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unitDraft: e.target.value } : x));
                                                     }}
-                                                    onCompositionEnd={(e) => {
-                                                        const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
-                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                                    onBlur={(e) => {
+                                                        const n = toDecimalSafe(e.target.value, 1);
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n, unitDraft: "" } : x));
                                                     }}
                                                 />
                                             </div>
@@ -604,16 +603,15 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                                 <input
                                                     className="w-full border rounded px-2 py-1 text-right text-sm"
                                                     inputMode="decimal"
-                                                    placeholder="例: 2"
-                                                    value={p.qty || ""}
+                                                    placeholder="例: 2.5"
+                                                    value={p.qtyDraft ?? (p.qty ? String(p.qty) : "")}
                                                     onChange={(e) => {
                                                         if (isComposingNative(e.nativeEvent)) return;
-                                                        const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
-                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qtyDraft: e.target.value } : x));
                                                     }}
-                                                    onCompositionEnd={(e) => {
-                                                        const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
-                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                                    onBlur={(e) => {
+                                                        const n = Math.max(0, toDecimalSafe(e.target.value, 1));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n, qtyDraft: "" } : x));
                                                     }}
                                                 />
                                             </div>
@@ -651,30 +649,28 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                             className="col-span-2 border rounded px-2 py-1 text-right text-sm"
                                             inputMode="decimal"
                                             placeholder="例: 1500"
-                                            value={p.unit || ""}
+                                            value={p.unitDraft ?? (p.unit ? String(p.unit) : "")}
                                             onChange={(e) => {
                                                 if (isComposingNative(e.nativeEvent)) return;
-                                                const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
-                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unitDraft: e.target.value } : x));
                                             }}
-                                            onCompositionEnd={(e) => {
-                                                const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
-                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                            onBlur={(e) => {
+                                                const n = toDecimalSafe(e.target.value, 1);
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n, unitDraft: "" } : x));
                                             }}
                                         />
                                         <input
                                             className="col-span-1 border rounded px-2 py-1 text-right text-sm"
                                             inputMode="decimal"
-                                            placeholder="例: 2"
-                                            value={p.qty || ""}
+                                            placeholder="例: 2.5"
+                                            value={p.qtyDraft ?? (p.qty ? String(p.qty) : "")}
                                             onChange={(e) => {
                                                 if (isComposingNative(e.nativeEvent)) return;
-                                                const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
-                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qtyDraft: e.target.value } : x));
                                             }}
-                                            onCompositionEnd={(e) => {
-                                                const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
-                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                            onBlur={(e) => {
+                                                const n = Math.max(0, toDecimalSafe(e.target.value, 1));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n, qtyDraft: "" } : x));
                                             }}
                                         />
                                         <div className="col-span-1 flex justify-end">
@@ -695,7 +691,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             <button
                                 type="button"
                                 className="px-3 py-1.5 rounded-lg border text-sm bg-white hover:bg-slate-50"
-                                onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 0 }])}
+                                onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 0, unitDraft: "", qtyDraft: "" }])}
                             >＋ 行を追加</button>
                         </div>
                     </div>
