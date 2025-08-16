@@ -766,30 +766,31 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                 ] as { key: LegalKey; label: string }[]).map(({ key, label }) => {
                                     const isJibai = key === "jibaiseki24m"; // ★自賠責だけ表示を変える
                                     return (
-                                        <div key={key} className="grid grid-cols-12 items-center gap-2">
-                                            <span className="col-span-6 sm:col-span-5">{label}</span>
+                                        <div key={key} className="grid grid-cols-12 gap-2">
+                                            {/* モバイル: 1行で表示、デスクトップ: ラベルと入力欄を分離 */}
+                                            <span className="col-span-6 sm:col-span-12">{label}</span>
 
-                                            {/* 左入力：自賠責=「ヶ月」／その他=「単価」 */}
+                                            {/* 左入力：自賠責=「金額」／その他=「単価」 */}
                                             <input
                                                 type="text" inputMode="decimal"
-                                                className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
+                                                className="col-span-3 sm:col-span-5 w-full border rounded px-2 py-1 text-right"
                                                 placeholder={isJibai ? "金額" : "単価"}
                                                 value={legalDraft[key].unit}
                                                 onChange={(e) => setLegalDraft((p) => ({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,.]/g, '') } }))}
                                                 onBlur={() => setLegal((p) => ({ ...p, [key]: { unit: toNum(legalDraft[key].unit), qty: p[key].qty } }))}
                                             />
 
-                                            {/* 右入力：自賠責=「金額」／その他=「個数」 */}
+                                            {/* 右入力：自賠責=「ヶ月」／その他=「個数」 */}
                                             <input
                                                 type="text" inputMode="decimal"
-                                                className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
+                                                className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
                                                 placeholder={isJibai ? "ヶ月" : "個数"}
                                                 value={legalDraft[key].qty}
                                                 onChange={(e) => setLegalDraft((p) => ({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,.]/g, '') } }))}
                                                 onBlur={() => setLegal((p) => ({ ...p, [key]: { unit: p[key].unit, qty: toNum(legalDraft[key].qty) } }))}
                                             />
 
-                                            <div className="col-span-12 sm:col-span-2 text-right">
+                                            <div className="col-span-12 sm:col-span-4 text-right font-medium">
                                                 {key === "jibaiseki24m" && yen(legal.jibaiseki24m.unit)} {/* ← ×qtyしない */}
                                                 {key === "weightTax" && yen(legal.weightTax.unit * legal.weightTax.qty)}
                                                 {key === "stamp" && yen(legal.stamp.unit * legal.stamp.qty)}
