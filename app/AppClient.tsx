@@ -526,7 +526,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                             </label>
                                         )}
                                         <div className="flex items-center gap-2 ml-auto">
-                                            <input type="number" min={1} value={qtyDraft[s.id] ?? 1} onChange={(e) => setQtyDraft({ ...qtyDraft, [s.id]: (e.target as HTMLInputElement).value })} className="w-24 border rounded-lg px-3 py-1.5 text-sm" />
+                                            <input type="number" inputMode="numeric" min={1} value={qtyDraft[s.id] ?? 1} onChange={(e) => setQtyDraft({ ...qtyDraft, [s.id]: (e.target as HTMLInputElement).value })} className="w-24 border rounded-lg px-3 py-1.5 text-sm" />
                                             <button type="button" onClick={() => addItem(s)} className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">追加</button>
                                         </div>
                                     </div>
@@ -538,79 +538,154 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                     <div className="bg-white rounded-2xl shadow-sm border p-3 mt-4">
                         <div className="text-sm font-semibold mb-2">手入力部品</div>
 
-                        {/* 列見出しでガイドを明確化 */}
-                        <div className="grid grid-cols-12 gap-2 text-[11px] text-slate-500 mb-1 px-1">
-                            <div className="col-span-12 sm:col-span-2">メーカー</div>
-                            <div className="col-span-12 sm:col-span-3">品目</div>
-                            <div className="col-span-12 sm:col-span-3">部品番号</div>
-                            <div className="col-span-6 sm:col-span-2 text-right">金額(円)</div>
-                            <div className="col-span-6 sm:col-span-1 text-right">個数</div>
-                            <div className="col-span-12 sm:col-span-1"></div>
+                        {/* 列見出しでガイドを明確化 - デスクトップのみ表示 */}
+                        <div className="hidden sm:grid grid-cols-12 gap-2 text-[11px] text-slate-500 mb-1 px-1">
+                            <div className="col-span-2">メーカー</div>
+                            <div className="col-span-3">品目</div>
+                            <div className="col-span-3">部品番号</div>
+                            <div className="col-span-2 text-right">金額(円)</div>
+                            <div className="col-span-1 text-right">個数</div>
+                            <div className="col-span-1"></div>
                         </div>
 
                         <div className="grid gap-3">
                             {customParts.map((p, idx) => (
-                                <div key={idx} className="grid grid-cols-12 gap-2 items-center border rounded-xl p-3">
-                                    <input
-                                        className="col-span-12 sm:col-span-2 border rounded px-2 py-1 text-sm"
-                                        placeholder="例: NGK"
-                                        value={p.maker}
-                                        onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, maker: e.target.value } : x))}
-                                    />
-                                    <input
-                                        className="col-span-12 sm:col-span-3 border rounded px-2 py-1 text-sm"
-                                        placeholder="例: スパークプラグ"
-                                        value={p.name}
-                                        onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                                    />
-                                    <input
-                                        className="col-span-12 sm:col-span-3 border rounded px-2 py-1 text-sm"
-                                        placeholder="例: DPR8EA-9"
-                                        value={p.partNo}
-                                        onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, partNo: e.target.value } : x))}
-                                    />
-
-                                    {/* 金額(円)：小数点1位まで対応 */}
-                                    <input
-                                        className="col-span-6 sm:col-span-2 border rounded px-2 py-1 text-right text-sm"
-                                        inputMode="decimal"
-                                        placeholder="0"
-                                        value={asInput(p.unit)}
-                                        onChange={(e) => {
-                                            if (isComposingNative(e.nativeEvent)) return; // 合成中は無視
-                                            const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
-                                            setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x)); // ★unit を更新
-                                        }}
-                                        onCompositionEnd={(e) => {
-                                            const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
-                                            setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x)); // ★unit を確定
-                                        }}
-                                    />
-
-
-                                    {/* 個数：小数点1位まで対応 */}
-                                    <input
-                                        className="col-span-6 sm:col-span-1 border rounded px-2 py-1 text-right text-sm"
-                                        inputMode="decimal"
-                                        placeholder="1"
-                                        value={asInput(p.qty)}
-                                        onChange={(e) => {
-                                            if (isComposingNative(e.nativeEvent)) return;
-                                            const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
-                                            setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x)); // ★qty を更新
-                                        }}
-                                        onCompositionEnd={(e) => {
-                                            const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
-                                            setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x)); // ★qty を確定
-                                        }}
-                                    />
-
-                                    <div className="col-span-12 sm:col-span-1 flex justify-end">
+                                <div key={idx} className="border rounded-xl p-3">
+                                    {/* スマホ用：縦並びレイアウト */}
+                                    <div className="grid grid-cols-1 gap-2 sm:hidden">
+                                        <div>
+                                            <label className="text-[10px] text-slate-500">メーカー</label>
+                                            <input
+                                                className="w-full border rounded px-2 py-1 text-sm"
+                                                placeholder="例: NGK"
+                                                value={p.maker}
+                                                onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, maker: e.target.value } : x))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500">品目</label>
+                                            <input
+                                                className="w-full border rounded px-2 py-1 text-sm"
+                                                placeholder="例: スパークプラグ"
+                                                value={p.name}
+                                                onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500">部品番号</label>
+                                            <input
+                                                className="w-full border rounded px-2 py-1 text-sm"
+                                                placeholder="例: DPR8EA-9"
+                                                value={p.partNo}
+                                                onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, partNo: e.target.value } : x))}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] text-slate-500">金額(円)</label>
+                                                <input
+                                                    className="w-full border rounded px-2 py-1 text-right text-sm"
+                                                    inputMode="decimal"
+                                                    placeholder="例: 1500"
+                                                    value={p.unit || ""}
+                                                    onChange={(e) => {
+                                                        if (isComposingNative(e.nativeEvent)) return;
+                                                        const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                                    }}
+                                                    onCompositionEnd={(e) => {
+                                                        const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500">個数</label>
+                                                <input
+                                                    className="w-full border rounded px-2 py-1 text-right text-sm"
+                                                    inputMode="decimal"
+                                                    placeholder="例: 2"
+                                                    value={p.qty || ""}
+                                                    onChange={(e) => {
+                                                        if (isComposingNative(e.nativeEvent)) return;
+                                                        const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                                    }}
+                                                    onCompositionEnd={(e) => {
+                                                        const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                         <button
                                             type="button"
-                                            className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
                                             onClick={() => setCustomParts(cs => cs.filter((_, i) => i !== idx))}
-                                        >削除</button>
+                                            className="w-full text-xs px-3 py-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
+                                        >
+                                            削除
+                                        </button>
+                                    </div>
+
+                                    {/* デスクトップ用：横並びレイアウト */}
+                                    <div className="hidden sm:grid grid-cols-12 gap-2 items-center">
+                                        <input
+                                            className="col-span-2 border rounded px-2 py-1 text-sm"
+                                            placeholder="例: NGK"
+                                            value={p.maker}
+                                            onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, maker: e.target.value } : x))}
+                                        />
+                                        <input
+                                            className="col-span-3 border rounded px-2 py-1 text-sm"
+                                            placeholder="例: スパークプラグ"
+                                            value={p.name}
+                                            onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                                        />
+                                        <input
+                                            className="col-span-3 border rounded px-2 py-1 text-sm"
+                                            placeholder="例: DPR8EA-9"
+                                            value={p.partNo}
+                                            onChange={e => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, partNo: e.target.value } : x))}
+                                        />
+                                        <input
+                                            className="col-span-2 border rounded px-2 py-1 text-right text-sm"
+                                            inputMode="decimal"
+                                            placeholder="例: 1500"
+                                            value={p.unit || ""}
+                                            onChange={(e) => {
+                                                if (isComposingNative(e.nativeEvent)) return;
+                                                const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                            }}
+                                            onCompositionEnd={(e) => {
+                                                const n = toDecimalSafe((e.target as HTMLInputElement).value, 1);
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n } : x));
+                                            }}
+                                        />
+                                        <input
+                                            className="col-span-1 border rounded px-2 py-1 text-right text-sm"
+                                            inputMode="decimal"
+                                            placeholder="例: 2"
+                                            value={p.qty || ""}
+                                            onChange={(e) => {
+                                                if (isComposingNative(e.nativeEvent)) return;
+                                                const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                            }}
+                                            onCompositionEnd={(e) => {
+                                                const n = Math.max(0, toDecimalSafe((e.target as HTMLInputElement).value, 1));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n } : x));
+                                            }}
+                                        />
+                                        <div className="col-span-1 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCustomParts(cs => cs.filter((_, i) => i !== idx))}
+                                                className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
+                                            >
+                                                削除
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -645,7 +720,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                         <div className="font-medium text-sm break-words">{it.name}</div>
                                         <div className="text-xs text-slate-500">{it.cat} / 単価 {yen(it.price)}</div>
                                     </div>
-                                    <input type="number" min={1} value={it.qty} onChange={(e) => updateQty(idx, (e.target as HTMLInputElement).value)} className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
+                                    <input type="number" inputMode="numeric" min={1} value={it.qty} onChange={(e) => updateQty(idx, (e.target as HTMLInputElement).value)} className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
                                     <div className="w-28 text-right text-sm font-semibold">{yen(it.price * it.qty)}</div>
                                     <button type="button" onClick={() => removeItem(idx)} className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100">削除</button>
                                 </div>
@@ -658,7 +733,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                         </div>
                                         <div className="text-xs text-slate-500">部品 / 単価 {yen(it.unit)}</div>
                                     </div>
-                                    <input type="number" min={0} value={it.qty}
+                                    <input type="number" inputMode="numeric" min={0} value={it.qty}
                                         onChange={(e) => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: Math.max(0, Number(e.target.value || 0)) } : x))}
                                         className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
                                     <div className="w-28 text-right text-sm font-semibold">{yen((it.unit || 0) * (it.qty || 0))}</div>
