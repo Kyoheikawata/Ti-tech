@@ -177,7 +177,7 @@ function isComposingNative(ev: unknown): boolean {
 export default function AppClient() {
     //自由部品入力
     const [customParts, setCustomParts] = useState<CustomPart[]>([
-        { maker: "", name: "", partNo: "", unit: 0, qty: 0, unitDraft: "", qtyDraft: "" },
+        { maker: "", name: "", partNo: "", unit: 0, qty: 0 },
     ]);
     // 検索・選択
     const [q, setQ] = useState("");
@@ -291,7 +291,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
     function addItem(svc: ServiceDef) {
         const usingBringIn = !!useBringIn[svc.id];
         const price = (usingBringIn && typeof svc.bringIn === "number") ? svc.bringIn : svc.price;
-        const qn = Math.max(1, Number(qtyDraft[svc.id] || 1));
+        const qn = Math.max(0.1, Number(qtyDraft[svc.id] || 1));
         setItems((prev) => {
             const idx = prev.findIndex((p) => p.id === svc.id && p.price === price);
             if (idx !== -1) { const next = [...prev]; next[idx] = { ...next[idx], qty: next[idx].qty + qn }; return next; }
@@ -301,7 +301,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
     }
     function removeItem(i: number) { setItems((prev) => prev.filter((_, idx) => idx !== i)); }
     function updateQty(i: number, v: string) {
-        const n = Math.max(1, Number(v || 1));
+        const n = Math.max(0.1, Number(v || 0.1));
         setItems((prev) => prev.map((x, idx) => idx === i ? { ...x, qty: n } : x));
     }
 
@@ -425,21 +425,21 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
 
                                             {/* 左入力：自賠責=「ヶ月」／その他=「単価」 */}
                                             <input
-                                                type="text" inputMode="numeric" pattern="\d*"
+                                                type="text" inputMode="decimal"
                                                 className="col-span-3 sm:col-span-3 w-full border rounded px-2 py-1 text-right"
                                                 placeholder={isJibai ? "金額" : "単価"}
                                                 value={legalDraft[key].unit}
-                                                onChange={(e) => setLegalDraft((p) => ({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,]/g, '') } }))}
+                                                onChange={(e) => setLegalDraft((p) => ({ ...p, [key]: { ...p[key], unit: e.target.value.replace(/[^\d,.]/g, '') } }))}
                                                 onBlur={() => setLegal((p) => ({ ...p, [key]: { unit: toNum(legalDraft[key].unit), qty: p[key].qty } }))}
                                             />
 
                                             {/* 右入力：自賠責=「金額」／その他=「個数」 */}
                                             <input
-                                                type="text" inputMode="numeric" pattern="\d*"
+                                                type="text" inputMode="decimal"
                                                 className="col-span-3 sm:col-span-2 w-full border rounded px-2 py-1 text-right"
                                                 placeholder={isJibai ? "ヶ月" : "個数"}
                                                 value={legalDraft[key].qty}
-                                                onChange={(e) => setLegalDraft((p) => ({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,]/g, '') } }))}
+                                                onChange={(e) => setLegalDraft((p) => ({ ...p, [key]: { ...p[key], qty: e.target.value.replace(/[^\d,.]/g, '') } }))}
                                                 onBlur={() => setLegal((p) => ({ ...p, [key]: { unit: p[key].unit, qty: toNum(legalDraft[key].qty) } }))}
                                             />
 
@@ -526,7 +526,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                             </label>
                                         )}
                                         <div className="flex items-center gap-2 ml-auto">
-                                            <input type="number" inputMode="numeric" min={1} value={qtyDraft[s.id] ?? 1} onChange={(e) => setQtyDraft({ ...qtyDraft, [s.id]: (e.target as HTMLInputElement).value })} className="w-24 border rounded-lg px-3 py-1.5 text-sm" />
+                                            <input type="number" inputMode="decimal" min={0.1} step={0.1} value={qtyDraft[s.id] ?? 1} onChange={(e) => setQtyDraft({ ...qtyDraft, [s.id]: (e.target as HTMLInputElement).value })} className="w-24 border rounded-lg px-3 py-1.5 text-sm" />
                                             <button type="button" onClick={() => addItem(s)} className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">追加</button>
                                         </div>
                                     </div>
@@ -594,7 +594,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                                     }}
                                                     onBlur={(e) => {
                                                         const n = toDecimalSafe(e.target.value, 1);
-                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n, unitDraft: "" } : x));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n, unitDraft: undefined } : x));
                                                     }}
                                                 />
                                             </div>
@@ -611,7 +611,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                                     }}
                                                     onBlur={(e) => {
                                                         const n = Math.max(0, toDecimalSafe(e.target.value, 1));
-                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n, qtyDraft: "" } : x));
+                                                        setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n, qtyDraft: undefined } : x));
                                                     }}
                                                 />
                                             </div>
@@ -656,7 +656,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                             }}
                                             onBlur={(e) => {
                                                 const n = toDecimalSafe(e.target.value, 1);
-                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n, unitDraft: "" } : x));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, unit: n, unitDraft: undefined } : x));
                                             }}
                                         />
                                         <input
@@ -670,7 +670,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                             }}
                                             onBlur={(e) => {
                                                 const n = Math.max(0, toDecimalSafe(e.target.value, 1));
-                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n, qtyDraft: "" } : x));
+                                                setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: n, qtyDraft: undefined } : x));
                                             }}
                                         />
                                         <div className="col-span-1 flex justify-end">
@@ -691,7 +691,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             <button
                                 type="button"
                                 className="px-3 py-1.5 rounded-lg border text-sm bg-white hover:bg-slate-50"
-                                onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 0, unitDraft: "", qtyDraft: "" }])}
+                                onClick={() => setCustomParts(cs => [...cs, { maker: "", name: "", partNo: "", unit: 0, qty: 0 }])}
                             >＋ 行を追加</button>
                         </div>
                     </div>
@@ -716,7 +716,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                         <div className="font-medium text-sm break-words">{it.name}</div>
                                         <div className="text-xs text-slate-500">{it.cat} / 単価 {yen(it.price)}</div>
                                     </div>
-                                    <input type="number" inputMode="numeric" min={1} value={it.qty} onChange={(e) => updateQty(idx, (e.target as HTMLInputElement).value)} className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
+                                    <input type="number" inputMode="decimal" min={0.1} step={0.1} value={it.qty} onChange={(e) => updateQty(idx, (e.target as HTMLInputElement).value)} className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
                                     <div className="w-28 text-right text-sm font-semibold">{yen(it.price * it.qty)}</div>
                                     <button type="button" onClick={() => removeItem(idx)} className="text-xs px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100">削除</button>
                                 </div>
@@ -729,7 +729,7 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                                         </div>
                                         <div className="text-xs text-slate-500">部品 / 単価 {yen(it.unit)}</div>
                                     </div>
-                                    <input type="number" inputMode="numeric" min={0} value={it.qty}
+                                    <input type="number" inputMode="decimal" min={0} step={0.1} value={it.qty}
                                         onChange={(e) => setCustomParts(cs => cs.map((x, i) => i === idx ? { ...x, qty: Math.max(0, Number(e.target.value || 0)) } : x))}
                                         className="w-20 border rounded-lg px-3 py-1.5 text-sm" />
                                     <div className="w-28 text-right text-sm font-semibold">{yen((it.unit || 0) * (it.qty || 0))}</div>
@@ -749,10 +749,10 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             <div className="grid grid-cols-12 items-center gap-2">
                                 <span className="col-span-6 sm:col-span-5">調整値引き</span>
                                 <input
-                                    type="text" inputMode="numeric" pattern="\d*"
+                                    type="text" inputMode="decimal"
                                     className="col-span-6 sm:col-span-7 w-full border rounded px-3 py-1.5 text-right"
                                     value={feesDraft.discount}
-                                    onChange={(e) => setFeesDraft({ ...feesDraft, discount: e.target.value.replace(/[^\d,]/g, '') })}
+                                    onChange={(e) => setFeesDraft({ ...feesDraft, discount: e.target.value.replace(/[^\d,.]/g, '') })}
                                     onBlur={() => setFees({ ...fees, discount: toNum(feesDraft.discount) })}
                                     placeholder="0"
                                 />
@@ -760,10 +760,10 @@ const internalTax = Math.floor(taxableAfterDiscount * taxRate / (1 + taxRate));
                             <div className="grid grid-cols-12 items-center gap-2">
                                 <span className="col-span-6 sm:col-span-5">預り金</span>
                                 <input
-                                    type="text" inputMode="numeric" pattern="\d*"
+                                    type="text" inputMode="decimal"
                                     className="col-span-6 sm:col-span-7 w-full border rounded px-3 py-1.5 text-right"
                                     value={feesDraft.deposit}
-                                    onChange={(e) => setFeesDraft({ ...feesDraft, deposit: e.target.value.replace(/[^\d,]/g, '') })}
+                                    onChange={(e) => setFeesDraft({ ...feesDraft, deposit: e.target.value.replace(/[^\d,.]/g, '') })}
                                     onBlur={() => setFees({ ...fees, deposit: toNum(feesDraft.deposit) })}
                                     placeholder="0"
                                 />
