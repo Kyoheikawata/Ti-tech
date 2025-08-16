@@ -175,9 +175,9 @@ await book.xlsx.readFile(templatePath);
   const jbQtyXls  = jbUnit > 0 ? 1 : 0;                  // Excel上の個数
   const L9        = jbUnit;  // 自賠責は金額そのもの（qtyは掛けない）
 
-  ws.getCell("D9").value = jbUnit;   ws.getCell("D9").numFmt = moneyFmt; // 単価=金額
-  ws.getCell("E9").value = jbQtyXls; ws.getCell("E9").numFmt = qtyFmt;   // 個数=1(0円なら0)
-  ws.getCell("F9").value = L9;       ws.getCell("F9").numFmt = moneyFmt;
+  const d9 = ws.getCell("D9"); d9.value = jbUnit; d9.numFmt = moneyFmt; d9.alignment = { horizontal: "right", vertical: "middle" };
+  const e9 = ws.getCell("E9"); e9.value = jbQtyXls; e9.numFmt = qtyFmt; e9.alignment = { horizontal: "center", vertical: "middle" };
+  const f9 = ws.getCell("F9"); f9.value = L9; f9.numFmt = moneyFmt; f9.alignment = { horizontal: "right", vertical: "middle" };
 
   // ラベルを「自賠責保険◯ヶ月」に書き換え（テンプレ内の既存ラベルを検索）
   const jl = findLabelCell(ws, [/自賠責保険/], { rowMin: 7, rowMax: 12 });
@@ -189,13 +189,23 @@ await book.xlsx.readFile(templatePath);
   const L10 = toNum(data.legal.weightTax.unit) * toNum(data.legal.weightTax.qty);
   const L11 = toNum(data.legal.stamp.unit)     * toNum(data.legal.stamp.qty);
 
-  ws.getCell("D10").value = toNum(data.legal.weightTax.unit); ws.getCell("D10").numFmt = moneyFmt;
-  ws.getCell("E10").value = toNum(data.legal.weightTax.qty);  ws.getCell("E10").numFmt = qtyFmt;
-  ws.getCell("F10").value = L10;                              ws.getCell("F10").numFmt = moneyFmt;
+  const d10 = ws.getCell("D10"); d10.value = toNum(data.legal.weightTax.unit); d10.numFmt = moneyFmt; d10.alignment = { horizontal: "right", vertical: "middle" };
+  const e10 = ws.getCell("E10"); e10.value = toNum(data.legal.weightTax.qty); e10.numFmt = qtyFmt; e10.alignment = { horizontal: "center", vertical: "middle" };
+  const f10 = ws.getCell("F10"); f10.value = L10; f10.numFmt = moneyFmt; f10.alignment = { horizontal: "right", vertical: "middle" };
 
-  ws.getCell("D11").value = toNum(data.legal.stamp.unit); ws.getCell("D11").numFmt = moneyFmt;
-  ws.getCell("E11").value = toNum(data.legal.stamp.qty);  ws.getCell("E11").numFmt = qtyFmt;
-  ws.getCell("F11").value = L11;                          ws.getCell("F11").numFmt = moneyFmt;
+  const d11 = ws.getCell("D11"); d11.value = toNum(data.legal.stamp.unit); d11.numFmt = moneyFmt; d11.alignment = { horizontal: "right", vertical: "middle" };
+  const e11 = ws.getCell("E11"); e11.value = toNum(data.legal.stamp.qty); e11.numFmt = qtyFmt; e11.alignment = { horizontal: "center", vertical: "middle" };
+  const f11 = ws.getCell("F11"); f11.value = L11; f11.numFmt = moneyFmt; f11.alignment = { horizontal: "right", vertical: "middle" };
+
+  // 法定費用のセル幅を自動調整（D、E、F列）
+  ['D', 'E', 'F'].forEach(col => {
+    const column = ws.getColumn(col);
+    if (column) {
+      // 最小幅を設定（単位: 文字数）
+      const minWidth = col === 'D' ? 12 : col === 'E' ? 8 : 12; // D列とF列は12文字、E列は8文字
+      column.width = Math.max(minWidth, column.width || 10);
+    }
+  });
     // ★ 追加：手入力部品を items 形式へ変換して結合
 // ★ 置換：name に (メーカー)(P/N...) を混ぜず、列で分ける
 const partsAsItems: ItemEx[] = (data.customParts ?? []).map((p, idx) => {
@@ -285,7 +295,7 @@ if (remarksText) {
   // 「小計」を「小計②」に変更
   const subtotalLabel = findLabelCell(ws, ["小計"], { searchFromBottom: true });
   if (subtotalLabel) {
-    ws.getCell(subtotalLabel.row, subtotalLabel.col).value = "小計②";
+    ws.getCell(subtotalLabel.row, subtotalLabel.col).value = "小計（税込）②";
   }
   
   // 合計①+②の計算を修正
