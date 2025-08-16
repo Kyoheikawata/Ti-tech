@@ -145,12 +145,13 @@ const toNum = (v: string | number) => {
     const s = v.replace(/,/g, "").trim();
     return s === "" ? 0 : Number(s);
 };
-const toIntSafe = (raw: string) => {
-    if (typeof raw !== "string") return 0;
-    const half = raw.replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0));
-    const cleaned = half.replace(/[^\d]/g, "");
-    return cleaned ? Number(cleaned) : 0;
-};
+// 未使用のため削除
+// const toIntSafe = (raw: string) => {
+//     if (typeof raw !== "string") return 0;
+//     const half = raw.replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0));
+//     const cleaned = half.replace(/[^\d]/g, "");
+//     return cleaned ? Number(cleaned) : 0;
+// };
 const toDecimalSafe = (raw: string, decimalPlaces: number = 1) => {
     if (typeof raw !== "string") return 0;
     // 全角数字を半角に変換
@@ -168,7 +169,8 @@ const toDecimalSafe = (raw: string, decimalPlaces: number = 1) => {
     // 小数点以下の桁数を制限
     return Math.round(num * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
 };
-const asInput = (n: number) => (Number.isFinite(n) ? String(n) : "");
+// 未使用のため削除
+// const asInput = (n: number) => (Number.isFinite(n) ? String(n) : "");
 
 function isComposingNative(ev: unknown): boolean {
     const obj = ev as { isComposing?: boolean };

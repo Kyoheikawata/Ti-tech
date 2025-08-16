@@ -127,7 +127,7 @@ await book.xlsx.readFile(templatePath);
     // 既存の結合を解除（エラー回避のため）
     try {
       ws.unMergeCells("A1:F1");
-    } catch (e) {
+    } catch {
       // 結合されていない場合は無視
     }
     
@@ -277,7 +277,7 @@ if (remarksText) {
   ws.getRow(37).height = calculatedHeight;
   
   // 備考が長い場合（3行以上）、ロゴと住所の位置を調整
-  const logoOffset = estimatedLines > 3 ? Math.floor((estimatedLines - 3) * 1) : 0;
+  // const logoOffset = estimatedLines > 3 ? Math.floor((estimatedLines - 3) * 1) : 0;
 } else {
   // 備考がない場合はデフォルトの高さ
   ws.getRow(37).height = 15;
@@ -322,11 +322,10 @@ if (remarksText) {
     const existingFormula = grandTotalCell.formula;
     console.log(`合計セル(${grandTotalLabel.row},6)の既存数式:`, existingFormula);
     
-    // 数式をクリアしてから値を設定
-    grandTotalCell.formula = undefined;
+    // 直接値を設定（数式は値の設定で上書きされる）
     grandTotalCell.value = grandTotalCorrect;
     grandTotalCell.numFmt = moneyFmt;
-    console.log(`合計セル ${grandTotalLabel.row},6 に ${grandTotalCorrect} を設定（数式クリア済み）`);
+    console.log(`合計セル ${grandTotalLabel.row},6 に ${grandTotalCorrect} を設定`);
   } else {
     console.log("警告: 合計ラベルが見つかりませんでした");
   }
